@@ -31,6 +31,11 @@ class LocalStore(context: Context) {
         get() = prefs.getFloat("text_scale", 1f)
         set(value) = prefs.edit().putFloat("text_scale", value).apply()
 
+    /** Extra size for story text (not titles), set by pinching on a card. */
+    var bodyZoom: Float
+        get() = prefs.getFloat("body_zoom", 1f)
+        set(value) = prefs.edit().putFloat("body_zoom", value).apply()
+
     var serif: Boolean
         get() = prefs.getBoolean("serif", false)
         set(value) = prefs.edit().putBoolean("serif", value).apply()

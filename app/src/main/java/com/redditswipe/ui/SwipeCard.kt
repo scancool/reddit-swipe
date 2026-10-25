@@ -7,6 +7,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,11 +21,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -35,6 +43,9 @@ import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -51,6 +62,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /** Fraction of the card width a slow drag must cover to count as a swipe. */
 private const val SWIPE_THRESHOLD = 0.3f
@@ -74,6 +86,10 @@ private val SnapBackSpring = spring<Float>(dampingRatio = 0.62f, stiffness = Spr
 
 // Posts this short read like one-liners (shower thoughts) and get larger, centered type.
 private const val SHORT_POST_CHARS = 280
+
+/** Limits for pinching the story text, relative to the size set in Settings. */
+private const val MIN_BODY_ZOOM = 0.7f
+private const val MAX_BODY_ZOOM = 2.5f
 
 /**
  * Position of the top card, shared by the drag gestures and the buttons. Offsets are plain snapshot
@@ -166,6 +182,8 @@ fun backScale(dragProgress: Float): Float = BACK_SCALE + (1f - BACK_SCALE) * dra
  * One story card. It is purely visual: position, tilt, scale and shadow come from [transform], which
  * runs in the card's single graphics layer, and [decision] (-1..1) fades in the SAVE/SKIP stamps.
  * Both are read only while drawing, so a moving card never recomposes or re-lays-out its text.
+ * With [onBodyZoom], pinching with two fingers resizes the story text (never the title) and reports
+ * the new zoom when the fingers lift.
  */
 @Composable
 fun SwipeCard(
@@ -174,6 +192,7 @@ fun SwipeCard(
     modifier: Modifier = Modifier,
     decision: (() -> Float)? = null,
     transform: GraphicsLayerScope.() -> Unit = {},
+    onBodyZoom: ((Float) -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val isShort = post.body.length < SHORT_POST_CHARS
@@ -193,10 +212,14 @@ fun SwipeCard(
             fontWeight = FontWeight.SemiBold,
         )
     }
-    val bodyStyle = remember(isShort, reading, typography) {
+    // Live zoom while pinching; snapped to 5% steps so the text re-wraps a few times per pinch, not every frame.
+    val zoom = remember(reading.bodyZoom) { mutableFloatStateOf(reading.bodyZoom) }
+    val zoomStep by remember(zoom) { derivedStateOf { (zoom.floatValue * 20).roundToInt() / 20f } }
+    var pinching by remember { mutableStateOf(false) }
+    val bodyStyle = remember(isShort, reading, typography, zoomStep) {
         val base = if (isShort) typography.titleLarge else typography.bodyLarge
         base.copy(
-            fontSize = base.fontSize * reading.textScale,
+            fontSize = base.fontSize * reading.textScale * zoomStep,
             lineHeight = 1.55.em,
             fontFamily = fontFamily,
             hyphens = Hyphens.Auto,
@@ -214,6 +237,13 @@ fun SwipeCard(
     }
     val scroll = rememberScrollState()
     val container = colors.surfaceContainerHigh
+    // Keeps the reader's place: as the text re-wraps, scroll to the same fraction of the story.
+    var scrollFraction by remember { mutableFloatStateOf(0f) }
+    if (pinching) {
+        LaunchedEffect(scroll) {
+            snapshotFlow { scroll.maxValue }.collect { max -> scroll.scrollTo((scrollFraction * max).roundToInt()) }
+        }
+    }
 
     // Box (for the stamps) > Column (header, text, footer): the card itself is just modifiers.
     Box(
@@ -233,7 +263,21 @@ fun SwipeCard(
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(vertical = 12.dp)
-                    .fadeBottomEdge(scroll, container),
+                    .fadeBottomEdge(scroll, container)
+                    .then(
+                        if (onBodyZoom == null || post.body.isBlank()) Modifier
+                        else Modifier.pinchToZoom(
+                            zoom = zoom,
+                            onStart = {
+                                scrollFraction = if (scroll.maxValue > 0) scroll.value.toFloat() / scroll.maxValue else 0f
+                                pinching = true
+                            },
+                            onEnd = {
+                                pinching = false
+                                onBodyZoom(it)
+                            },
+                        ),
+                    ),
                 contentAlignment = if (isShort) Alignment.Center else Alignment.TopStart,
             ) {
                 Column(Modifier.fillMaxWidth().verticalScroll(scroll)) {
@@ -242,9 +286,21 @@ fun SwipeCard(
                         Text(post.body, style = bodyStyle, modifier = Modifier.padding(top = 14.dp))
                     }
                 }
+                if (pinching) {
+                    Text(
+                        "${(zoom.floatValue * 100).roundToInt()}%",
+                        style = typography.labelLarge,
+                        color = colors.inverseOnSurface,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .background(colors.inverseSurface.copy(alpha = 0.85f), RoundedCornerShape(50))
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                    )
+                }
             }
             Text(
-                "${post.readMinutes} min read  ·  ▲ ${post.score}  ·  ${post.numComments} comments",
+                (if (isShort) "Quick read" else "${post.readMinutes} min read") +
+                    "  ·  ▲ ${post.score}  ·  ${post.numComments} comments",
                 style = typography.labelMedium,
                 color = colors.onSurfaceVariant,
             )
@@ -303,6 +359,33 @@ private fun DrawScope.drawDecisionTint(d: Float, save: Color, skip: Color) {
     val color = (if (d > 0) save else skip).copy(alpha = 0.16f * a)
     val (from, to) = if (d > 0) 0f to size.width * 0.6f else size.width to size.width * 0.4f
     drawRect(Brush.horizontalGradient(listOf(color, Color.Transparent), startX = from, endX = to))
+}
+
+/**
+ * Two-finger pinch that scales [zoom]. It listens in the Initial pass and consumes two-finger moves,
+ * so the story doesn't scroll and the card doesn't swipe while pinching; one finger passes straight through.
+ */
+private fun Modifier.pinchToZoom(
+    zoom: MutableFloatState,
+    onStart: () -> Unit,
+    onEnd: (Float) -> Unit,
+) = pointerInput(zoom) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        var zooming = false
+        do {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            if (event.changes.count { it.pressed } >= 2) {
+                if (!zooming) {
+                    zooming = true
+                    onStart()
+                }
+                zoom.floatValue = (zoom.floatValue * event.calculateZoom()).coerceIn(MIN_BODY_ZOOM, MAX_BODY_ZOOM)
+                event.changes.forEach { if (it.positionChanged()) it.consume() }
+            }
+        } while (event.changes.any { it.pressed })
+        if (zooming) onEnd(zoom.floatValue)
+    }
 }
 
 /** Fades the text out at the bottom while more of the story is below, hinting that it scrolls. */

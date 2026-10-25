@@ -11,6 +11,8 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 - Swipe left: skip.
 - Swipe up (or tap) on "Next" between the ✕ and ♥ buttons: move on to the next story.
 - Only story-length text posts (300+ characters) from story subreddits like TrueOffMyChest, tifu and AITAH; no question subs where the content is in the comments.
+- Quick-read subreddits (Showerthoughts, LifeProTips, YouShouldKnow, Jokes, DadJokes) keep short posts too, shown in larger centered type; add them from the chips on the Subreddits screen (`QUICK_READ_SUBREDDITS` in `data/RedditRepository.kt`).
+- Pinch the story text with two fingers to zoom it (the title stays put); Settings shows the zoom and can reset it.
 - ↶ in the top bar undoes the last swipe (up to 30).
 - ☰ menu: Swipe, Saved, Subreddits (add/remove), Stats (stories and minutes read per day), Settings
   (text size, serif font, NSFW stories, download stories for offline reading).

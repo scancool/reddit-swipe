@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.redditswipe.data.DayStats
 import com.redditswipe.data.LocalStore
+import com.redditswipe.data.QUICK_READ_SUBREDDITS
 import com.redditswipe.data.RedditPost
 import com.redditswipe.data.RedditRepository
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +26,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
-data class ReadingSettings(val textScale: Float = 1f, val serif: Boolean = false)
+data class ReadingSettings(val textScale: Float = 1f, val serif: Boolean = false, val bodyZoom: Float = 1f)
 
 data class SwipeUiState(
     val deck: List<RedditPost> = emptyList(),
@@ -56,7 +57,7 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         SwipeUiState(
             subreddits = store.subreddits ?: DEFAULT_SUBREDDITS,
             showNsfw = store.showNsfw,
-            reading = ReadingSettings(store.textScale, store.serif),
+            reading = ReadingSettings(store.textScale, store.serif, store.bodyZoom),
         ),
     )
     val state: StateFlow<SwipeUiState> = _state.asStateFlow()
@@ -145,6 +146,11 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
     fun setTextScale(scale: Float) {
         store.textScale = scale
         _state.update { it.copy(reading = it.reading.copy(textScale = scale)) }
+    }
+
+    fun setBodyZoom(zoom: Float) {
+        store.bodyZoom = zoom
+        _state.update { it.copy(reading = it.reading.copy(bodyZoom = zoom)) }
     }
 
     fun setSerif(serif: Boolean) {
@@ -323,7 +329,7 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
             "gonewildstories",
             "sexstories",
             "eroticliterature",
-        )
+        ) + QUICK_READ_SUBREDDITS
 
         private val SUBREDDIT_NAME = Regex("[A-Za-z0-9_]{2,21}")
         private const val MAX_UNDO = 30

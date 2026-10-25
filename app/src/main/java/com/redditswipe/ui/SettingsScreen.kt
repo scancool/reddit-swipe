@@ -38,6 +38,7 @@ fun SettingsScreen(
     isDownloading: Boolean,
     onTextScale: (Float) -> Unit,
     onSerif: (Boolean) -> Unit,
+    onBodyZoom: (Float) -> Unit,
     onShowNsfw: (Boolean) -> Unit,
     onDownload: () -> Unit,
     modifier: Modifier = Modifier,
@@ -54,6 +55,17 @@ fun SettingsScreen(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             OutlinedButton(onClick = { onTextScale(TEXT_SCALES[index + 1]) }, enabled = index < TEXT_SCALES.lastIndex) { Text("A+") }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Story text zoom: ${(reading.bodyZoom * 100).roundToInt()}%")
+                Text(
+                    "Pinch the story text on a card with two fingers to zoom it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            OutlinedButton(onClick = { onBodyZoom(1f) }, enabled = reading.bodyZoom != 1f) { Text("Reset") }
         }
         SettingSwitch("Serif font", reading.serif, onSerif)
         Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {

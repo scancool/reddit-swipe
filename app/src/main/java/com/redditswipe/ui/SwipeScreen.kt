@@ -91,6 +91,7 @@ fun SwipeScreen(
     onNext: (RedditPost) -> Unit,
     onRetry: () -> Unit,
     onOpenSubreddits: () -> Unit,
+    onBodyZoom: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val view = LocalView.current
@@ -193,6 +194,7 @@ fun SwipeScreen(
                                 )
                             },
                         transform = if (isTop) topTransform else backTransform,
+                        onBodyZoom = if (isTop) onBodyZoom else null,
                     )
                 }
             }

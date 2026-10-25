@@ -10,7 +10,8 @@ import java.net.URLEncoder
 
 /**
  * Fetches subreddit listings through the relay Worker (see /relay), which calls Reddit's
- * official API, and keeps only story-length text (self) posts.
+ * official API, and keeps only text (self) posts: story-length ones, or any length from the
+ * quick-read subreddits in [QUICK_READ_SUBREDDITS].
  */
 class RedditRepository {
 
@@ -48,22 +49,25 @@ class RedditRepository {
             val json = connection.inputStream.bufferedReader().use { it.readText() }
             val data = JSONObject(json).getJSONObject("data")
             val next = data.optString("after").takeIf { it.isNotEmpty() && it != "null" }
-            parseTextPosts(data) to next
+            val quickRead = QUICK_READ_SUBREDDITS.any { it.equals(subreddit, ignoreCase = true) }
+            parseTextPosts(data, quickRead) to next
         } finally {
             connection.disconnect()
         }
     }
 
-    private fun parseTextPosts(data: JSONObject): List<RedditPost> {
+    private fun parseTextPosts(data: JSONObject, quickRead: Boolean): List<RedditPost> {
         val children = data.getJSONArray("children")
         return (0 until children.length()).mapNotNull { i ->
             val post = children.getJSONObject(i).getJSONObject("data")
-            val body = post.optString("selftext")
-            val isStory = post.optBoolean("is_self") &&
+            // Removed and deleted posts keep their title but replace the body with a marker.
+            val body = post.optString("selftext").takeUnless { it == "[removed]" || it == "[deleted]" }.orEmpty()
+            val isText = post.optBoolean("is_self") &&
                 !post.optBoolean("is_video") &&
                 !post.optBoolean("stickied") &&
-                body.length >= MIN_BODY_LENGTH
-            if (!isStory) return@mapNotNull null
+                post.isNull("removed_by_category")
+            val longEnough = quickRead || body.length >= MIN_BODY_LENGTH
+            if (!isText || !longEnough) return@mapNotNull null
             RedditPost(
                 id = post.getString("id"),
                 subreddit = post.getString("subreddit"),
@@ -81,5 +85,14 @@ class RedditRepository {
 
 // Shorter posts are usually questions whose answers live in the comments.
 private const val MIN_BODY_LENGTH = 300
+
+/** Subreddits whose whole point is a short post (often just the title), so any length is kept. */
+val QUICK_READ_SUBREDDITS = listOf(
+    "Showerthoughts",
+    "LifeProTips",
+    "YouShouldKnow",
+    "Jokes",
+    "DadJokes",
+)
 
 class RedditException(message: String) : Exception(message)

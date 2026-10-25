@@ -137,6 +137,7 @@ class MainActivity : ComponentActivity() {
                                 onNext = vm::swipeLeft,
                                 onRetry = vm::loadMore,
                                 onOpenSubreddits = { screen = Screen.Subreddits },
+                                onBodyZoom = vm::setBodyZoom,
                                 modifier = content,
                             )
                             Screen.Saved -> SavedScreen(
@@ -161,6 +162,7 @@ class MainActivity : ComponentActivity() {
                                 isDownloading = state.isDownloading,
                                 onTextScale = vm::setTextScale,
                                 onSerif = vm::setSerif,
+                                onBodyZoom = vm::setBodyZoom,
                                 onShowNsfw = vm::setShowNsfw,
                                 onDownload = vm::downloadForOffline,
                                 modifier = content,
