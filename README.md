@@ -13,7 +13,7 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 
 ## Stack
 - Kotlin + Jetpack Compose (Material 3), minSdk 26, targetSdk 35
-- Reddit's public JSON listings (`https://www.reddit.com/r/<sub>/hot.json`), no login
+- Reddit's official API, reached through a small Cloudflare Worker relay (`relay/`) that keeps the Reddit app secret off the phone
 - No database yet: saved posts live in memory and are lost when the app is closed
 
 ## Building on GitHub
@@ -45,11 +45,17 @@ the same release key. The key lives outside this repo in `../reddit-swipe-signin
 - `ui/SwipeScreen.kt`: card stack plus skip/save buttons
 - `ui/SavedScreen.kt`: saved posts; tap one to open it on Reddit
 
-## Known issue: Reddit may block the requests
-When this was set up, Reddit answered a test request from the dev Mac with **HTTP 403**. Reddit restricts
-unauthenticated API access, and whether a phone on a home or mobile network gets through isn't known yet.
-If the app shows "returned HTTP 403", the fix is Reddit's official OAuth API: register an app at
-reddit.com/prefs/apps (this may need approval from Reddit) and switch the repository to `oauth.reddit.com`.
+## Reddit relay (`relay/`)
+Reddit blocks unauthenticated requests (HTTP 403) and no longer lets new API apps be created without
+approval, so the app talks to a Cloudflare Worker at `https://reddit-swipe-relay.abella.workers.dev`.
+The Worker uses an existing Reddit "web app" (client credentials) whose ID and secret are stored as
+Worker secrets, never in this repo. It only serves subreddit listings (`GET /r/<sub>/hot|new|top|rising`)
+and caches responses for 2 minutes.
+
+Redeploy after changing it:
+```bash
+cd relay && npx wrangler deploy
+```
 
 ## Ideas for later
 - Keep saved posts on the device (Room)

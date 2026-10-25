@@ -1,0 +1,6 @@
+name = "reddit-swipe-relay"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+# Secrets (set with `npx wrangler secret put <NAME>`, never committed):
+#   REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET

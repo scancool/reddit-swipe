@@ -13,3 +13,7 @@
 *.p12
 *.jks
 *.keystore
+
+# Cloudflare Worker local state
+relay/.wrangler/
+relay/.dev.vars

@@ -1,5 +1,6 @@
 package com.redditswipe.data
 
+import com.redditswipe.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -8,7 +9,8 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Fetches posts from Reddit's public JSON listings and keeps only text (self) posts.
+ * Fetches subreddit listings through the relay Worker (see /relay), which calls Reddit's
+ * official API, and keeps only text (self) posts.
  */
 class RedditRepository {
 
@@ -19,13 +21,11 @@ class RedditRepository {
         withContext(Dispatchers.IO) {
             val after = afterTokens[subreddit]
             val query = buildString {
-                append("limit=").append(limit).append("&raw_json=1")
+                append("limit=").append(limit)
                 if (after != null) append("&after=").append(URLEncoder.encode(after, "UTF-8"))
             }
-            val url = URL("https://www.reddit.com/r/$subreddit/hot.json?$query")
+            val url = URL("${BuildConfig.RELAY_URL}/r/$subreddit/hot?$query")
             val connection = (url.openConnection() as HttpURLConnection).apply {
-                // Reddit rejects requests without a descriptive User-Agent.
-                setRequestProperty("User-Agent", "android:com.redditswipe:v0.1 (personal use)")
                 connectTimeout = 10_000
                 readTimeout = 10_000
             }
