@@ -9,12 +9,11 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 - One card on screen at a time showing a Reddit text post (title + body, subreddit, score).
 - Swipe right: save / like.
 - Swipe left: skip.
-- Swipe up (or tap) on "Next" between the ✕ and ♥ buttons: move on to the next story.
 - Only story-length text posts (300+ characters) from story subreddits like TrueOffMyChest, tifu and AITAH; no question subs where the content is in the comments.
 - Quick-read subreddits (Showerthoughts, LifeProTips, YouShouldKnow, Jokes, DadJokes) keep short posts too, shown in larger centered type; add them from the chips on the Subreddits screen (`QUICK_READ_SUBREDDITS` in `data/RedditRepository.kt`).
 - A Quick reads / Mixed / Long reads switch above the cards picks which kind of post to deal; it's remembered.
 - Pinch the story text with two fingers to zoom it (the title stays put); Settings shows the zoom and can reset it.
-- ↶ in the top bar undoes the last swipe (up to 30).
+- ↶ in the top bar undoes the last swipe (up to 30); ♡ next to it saves the current story, like swiping right.
 - ☰ menu: Swipe, Saved, Subreddits (add/remove), Stats (stories and minutes read per day), Settings
   (text size, serif font, NSFW stories, download stories for offline reading).
 - Saved posts, swiped history (so stories don't repeat), the unread deck (offline cache) and stats are kept on the phone.
@@ -50,7 +49,7 @@ the same release key. The key lives outside this repo in `../reddit-swipe-signin
 - `app/src/main/java/com/redditswipe/data/RedditRepository.kt`: fetches listings and keeps only story-length text posts, flagging NSFW ones
 - `SwipeViewModel.kt`: the card deck, saved list, NSFW setting, and the subreddits to pull from (edit `storySubreddits` / `nsfwSubreddits`)
 - `ui/SwipeCard.kt`: the story card (typography, SAVE/SKIP stamps) and `CardSwipeState` (swipe thresholds and decisions)
-- `ui/SwipeScreen.kt`: card stack, drag/fling gestures, exit animations, skip/save buttons and the Next zone
+- `ui/SwipeScreen.kt`: card stack, read-mode switch, drag/fling gestures and exit animations
 - `ui/FeedEndCard.kt`: what sits under the last card: loading placeholder, error, no subreddits, or end of feed
 - `ui/SavedScreen.kt`: saved posts; tap one to open it on Reddit
 

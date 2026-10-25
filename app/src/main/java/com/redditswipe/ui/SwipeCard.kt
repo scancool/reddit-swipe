@@ -70,9 +70,6 @@ private const val SWIPE_THRESHOLD = 0.3f
 /** A fast flick only needs to move this fraction of the width, so it can't fire from a stray tap. */
 private const val FLING_MIN_DISTANCE = 0.08f
 
-/** Fraction of the card height the card must be pushed up to move on to the next story. */
-private const val UP_THRESHOLD = 0.12f
-
 /** Tilt in degrees when the card has been dragged one full width. */
 private const val MAX_ROTATION = 14f
 
@@ -92,20 +89,17 @@ private const val MIN_BODY_ZOOM = 0.7f
 private const val MAX_BODY_ZOOM = 2.5f
 
 /**
- * Position of the top card, shared by the drag gestures and the buttons. Offsets are plain snapshot
+ * Position of the top card, shared by the drag gesture and the top bar's heart. Offsets are plain snapshot
  * state written straight from pointer events and read only inside graphicsLayer, so dragging redraws
  * the card without recomposing it.
  */
 @Stable
 class CardSwipeState(
     val widthPx: Float,
-    val heightPx: Float,
     private val flingVelocityPx: Float,
     initialScale: Float,
 ) {
     var offsetX by mutableFloatStateOf(0f)
-        private set
-    var offsetY by mutableFloatStateOf(0f)
         private set
 
     /** +1 when grabbed in the top half, -1 in the bottom half, so the card pivots around the finger. */
@@ -121,15 +115,10 @@ class CardSwipeState(
     /** -1..1, how far the card has been dragged toward skip (-1) or save (+1). */
     val progress: Float get() = (offsetX / threshold).coerceIn(-1f, 1f)
 
-    /** 0..1, how far the card has been pushed toward "next". */
-    val upProgress: Float get() = (-offsetY / (heightPx * UP_THRESHOLD)).coerceIn(0f, 1f)
-
     val rotation: Float get() = (offsetX / widthPx) * MAX_ROTATION * tiltDirection
 
     /** True when the drag has gone far enough that letting go now would swipe. */
     val isPastThreshold: Boolean get() = abs(offsetX) > threshold
-
-    val isPastUpThreshold: Boolean get() = upProgress >= 1f
 
     /** Stops a running snap-back so a new drag picks the card up where it is. */
     fun grab() {
@@ -138,11 +127,6 @@ class CardSwipeState(
 
     fun dragBy(dx: Float) {
         offsetX += dx
-    }
-
-    /** Moves the card up with the finger; it never goes below its resting place. */
-    fun dragUpBy(dy: Float) {
-        offsetY = (offsetY + dy).coerceAtMost(0f)
     }
 
     /**
@@ -161,16 +145,10 @@ class CardSwipeState(
         }
     }
 
-    /** Decides an upward release: true to move on to the next story. */
-    fun decideUp(velocityY: Float): Boolean =
-        (velocityY < -flingVelocityPx && -offsetY > heightPx * FLING_MIN_DISTANCE) ||
-            (isPastUpThreshold && velocityY < flingVelocityPx)
-
     fun snapBack(scope: CoroutineScope) {
         settleJob?.cancel()
         settleJob = scope.launch {
-            launch { animate(offsetX, 0f, animationSpec = SnapBackSpring) { v, _ -> offsetX = v } }
-            launch { animate(offsetY, 0f, animationSpec = SnapBackSpring) { v, _ -> offsetY = v } }
+            animate(offsetX, 0f, animationSpec = SnapBackSpring) { v, _ -> offsetX = v }
         }
     }
 }

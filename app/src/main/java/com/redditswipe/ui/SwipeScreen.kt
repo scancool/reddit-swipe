@@ -10,32 +10,19 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -43,12 +30,12 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.GraphicsLayerScope
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
@@ -67,7 +54,6 @@ import com.redditswipe.data.RedditPost
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.max
 
 /** Cards wider than this make lines too long to read comfortably (tablets, landscape). */
 private val MaxCardWidth = 560.dp
@@ -75,7 +61,21 @@ private val MaxCardWidth = 560.dp
 /** Release speed that counts as a deliberate flick. */
 private val FlingVelocity = 900.dp
 
-private enum class Exit { Left, Right, Up }
+private enum class Exit { Left, Right }
+
+/**
+ * Lets controls outside the swipe screen (the heart in the top bar) act on the top card, so it
+ * leaves with the same animation as a swipe.
+ */
+@Stable
+class DeckController {
+    internal var saveTopCard: (() -> Unit)? = null
+
+    /** Saves the story on top of the deck, as if it were swiped right. */
+    fun saveTop() {
+        saveTopCard?.invoke()
+    }
+}
 
 /** A swiped card playing its exit animation; the deck has already moved on underneath it. */
 private class LeavingCard(
@@ -83,7 +83,6 @@ private class LeavingCard(
     val post: RedditPost,
     val exit: Exit,
     val startX: Float,
-    val startY: Float,
     val startRotation: Float,
     val velocity: Float,
 )
@@ -93,11 +92,11 @@ fun SwipeScreen(
     state: SwipeUiState,
     onSwipeLeft: (RedditPost) -> Unit,
     onSwipeRight: (RedditPost) -> Unit,
-    onNext: (RedditPost) -> Unit,
     onRetry: () -> Unit,
     onOpenSubreddits: () -> Unit,
     onBodyZoom: (Float) -> Unit,
     onReadMode: (ReadMode) -> Unit,
+    controller: DeckController,
     modifier: Modifier = Modifier,
 ) {
     val view = LocalView.current
@@ -116,15 +115,14 @@ fun SwipeScreen(
     // How big the card underneath was when the top one left, so it grows on from there instead of popping.
     var handoffScale by remember { mutableFloatStateOf(BACK_SCALE) }
 
-    // One swipe state per top card, shared by the drag gesture, the buttons and the Next zone.
-    val swipeState = remember(top?.id, cardWidthPx, slotSize.height) {
-        // Sizes are 0 until the first layout; 1px keeps the progress math finite until then.
-        CardSwipeState(cardWidthPx.coerceAtLeast(1f), slotSize.height.coerceAtLeast(1).toFloat(), flingPx, handoffScale)
+    // One swipe state per top card, shared by the drag gesture and the top bar's heart.
+    val swipeState = remember(top?.id, cardWidthPx) {
+        // The width is 0 until the first layout; 1px keeps the progress math finite until then.
+        CardSwipeState(cardWidthPx.coerceAtLeast(1f), flingPx, handoffScale)
     }
-    val dragAmount = { max(abs(swipeState.progress), swipeState.upProgress) }
+    val dragAmount = { abs(swipeState.progress) }
     val topTransform: GraphicsLayerScope.() -> Unit = {
         translationX = swipeState.offsetX
-        translationY = swipeState.offsetY
         rotationZ = swipeState.rotation
         scaleX = swipeState.scale.value
         scaleY = swipeState.scale.value
@@ -150,16 +148,16 @@ fun SwipeScreen(
             post = post,
             exit = exit,
             startX = swipeState.offsetX,
-            startY = swipeState.offsetY,
             startRotation = swipeState.rotation,
             velocity = velocity,
         )
         when (exit) {
             Exit.Left -> onSwipeLeft(post)
             Exit.Right -> onSwipeRight(post)
-            Exit.Up -> onNext(post)
         }
     }
+    SideEffect { controller.saveTopCard = { top?.let { commit(it, Exit.Right, 0f) } } }
+    DisposableEffect(controller) { onDispose { controller.saveTopCard = null } }
 
     Column(modifier.fillMaxSize().padding(16.dp)) {
         ReadModeSwitch(state.readMode, onReadMode, Modifier.align(Alignment.CenterHorizontally).padding(bottom = 12.dp))
@@ -198,7 +196,6 @@ fun SwipeScreen(
                                 customActions = listOf(
                                     CustomAccessibilityAction("Save") { commit(post, Exit.Right, 0f); true },
                                     CustomAccessibilityAction("Skip") { commit(post, Exit.Left, 0f); true },
-                                    CustomAccessibilityAction("Next story") { commit(post, Exit.Up, 0f); true },
                                 )
                             },
                         transform = if (isTop) topTransform else backTransform,
@@ -209,36 +206,13 @@ fun SwipeScreen(
 
             leaving.forEach { card ->
                 key("leaving-${card.id}") {
-                    LeavingCardView(card, state.reading, cardModifier, cardWidthPx, slotSize.height.toFloat()) {
+                    LeavingCardView(card, state.reading, cardModifier, cardWidthPx) {
                         leaving -= card
                     }
                 }
             }
         }
 
-        Row(
-            Modifier.fillMaxWidth().padding(top = 16.dp, start = 24.dp, end = 24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DecisionButton(
-                enabled = top != null,
-                emphasis = { (-swipeState.progress).coerceAtLeast(0f) },
-                onClick = { top?.let { commit(it, Exit.Left, 0f) } },
-            ) { Icon(Icons.Filled.Close, contentDescription = "Skip") }
-
-            NextZone(
-                enabled = top != null,
-                swipeState = swipeState,
-                view = view,
-                onNext = { v -> top?.let { commit(it, Exit.Up, v) } },
-            )
-
-            DecisionButton(
-                enabled = top != null,
-                emphasis = { swipeState.progress.coerceAtLeast(0f) },
-                onClick = { top?.let { commit(it, Exit.Right, 0f) } },
-            ) { Icon(Icons.Filled.Favorite, contentDescription = "Save") }
-        }
     }
 }
 
@@ -302,85 +276,6 @@ private fun Modifier.horizontalSwipe(
     }
 }
 
-/** Swipe up (or tap) between the buttons to move on to the next story. */
-@Composable
-private fun RowScope.NextZone(
-    enabled: Boolean,
-    swipeState: CardSwipeState,
-    view: View,
-    onNext: (velocity: Float) -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    Column(
-        Modifier
-            .weight(1f)
-            .height(80.dp)
-            .pointerInput(swipeState, enabled) {
-                if (!enabled) return@pointerInput
-                val tracker = VelocityTracker()
-                var wasPast = false
-                detectVerticalDragGestures(
-                    onDragStart = {
-                        swipeState.grab()
-                        tracker.resetTracking()
-                        wasPast = false
-                    },
-                    onVerticalDrag = { change, dy ->
-                        change.consume()
-                        tracker.addPosition(change.uptimeMillis, change.position)
-                        swipeState.dragUpBy(dy)
-                        val past = swipeState.isPastUpThreshold
-                        if (past != wasPast) view.thresholdHaptic()
-                        wasPast = past
-                    },
-                    onDragEnd = {
-                        val v = tracker.calculateVelocity().y
-                        if (swipeState.decideUp(v)) onNext(v) else swipeState.snapBack(scope)
-                    },
-                    onDragCancel = { swipeState.snapBack(scope) },
-                )
-            }
-            .pointerInput(swipeState, enabled) {
-                if (enabled) detectTapGestures { onNext(0f) }
-            }
-            .semantics(mergeDescendants = true) {},
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        val hintColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 0.8f else 0.3f)
-        // The arrow rides up a little with the card, tying the gesture to the hint.
-        Icon(
-            Icons.Filled.KeyboardArrowUp,
-            contentDescription = "Next story",
-            tint = hintColor,
-            modifier = Modifier.graphicsLayer { translationY = -8.dp.toPx() * swipeState.upProgress },
-        )
-        Text("Next", style = MaterialTheme.typography.labelMedium, color = hintColor)
-    }
-}
-
-/** A Skip/Save button that swells as the card is dragged toward its side. */
-@Composable
-private fun DecisionButton(
-    enabled: Boolean,
-    emphasis: () -> Float,
-    onClick: () -> Unit,
-    icon: @Composable () -> Unit,
-) {
-    FilledTonalIconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier
-            .size(64.dp)
-            .graphicsLayer {
-                val s = 1f + 0.15f * emphasis()
-                scaleX = s
-                scaleY = s
-            },
-        content = icon,
-    )
-}
-
 /** Flies a committed card off screen from wherever the finger let go, then removes itself. */
 @Composable
 private fun LeavingCardView(
@@ -388,32 +283,21 @@ private fun LeavingCardView(
     reading: ReadingSettings,
     modifier: Modifier,
     widthPx: Float,
-    heightPx: Float,
     onGone: () -> Unit,
 ) {
     val x = remember { Animatable(card.startX) }
-    val y = remember { Animatable(card.startY) }
     val rotation = remember { Animatable(card.startRotation) }
-    val decision = when (card.exit) {
-        Exit.Right -> 1f
-        Exit.Left -> -1f
-        Exit.Up -> 0f
-    }
+    val decision = if (card.exit == Exit.Right) 1f else -1f
     LaunchedEffect(card) {
-        val (targetX, targetY) = when (card.exit) {
-            Exit.Right -> widthPx * 1.5f to card.startY
-            Exit.Left -> -widthPx * 1.5f to card.startY
-            Exit.Up -> card.startX to -heightPx * 1.2f
-        }
-        val distance = abs(if (card.exit == Exit.Up) targetY - card.startY else targetX - card.startX)
-        // A flung card keeps the finger's speed; a button press accelerates away from rest.
+        val targetX = widthPx * 1.5f * decision
+        val distance = abs(targetX - card.startX)
+        // A flung card keeps the finger's speed; a tap on the heart accelerates away from rest.
         val flung = abs(card.velocity) > 1f
         val duration = if (flung) (distance / abs(card.velocity) * 1000f).toInt().coerceIn(120, 300) else 260
         val spec = tween<Float>(duration, easing = if (flung) LinearEasing else FastOutLinearInEasing)
         coroutineScope {
             launch { x.animateTo(targetX, spec) }
-            launch { y.animateTo(targetY, spec) }
-            if (card.exit != Exit.Up) launch { rotation.animateTo(decision * 22f, spec) }
+            launch { rotation.animateTo(decision * 22f, spec) }
         }
         onGone()
     }
@@ -424,7 +308,6 @@ private fun LeavingCardView(
         modifier = modifier,
         transform = {
             translationX = x.value
-            translationY = y.value
             rotationZ = rotation.value
             shadowElevation = 14.dp.toPx()
         },

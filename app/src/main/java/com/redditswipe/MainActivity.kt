@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Menu
@@ -28,6 +29,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -38,6 +40,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.redditswipe.ui.DeckController
 import com.redditswipe.ui.SavedScreen
 import com.redditswipe.ui.SettingsScreen
 import com.redditswipe.ui.StatsScreen
@@ -68,6 +71,7 @@ class MainActivity : ComponentActivity() {
                 var screen by rememberSaveable { mutableStateOf(Screen.Swipe) }
                 val drawerState = rememberDrawerState(DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
+                val deck = remember { DeckController() }
 
                 val updates: UpdateViewModel = viewModel()
                 val updateState by updates.state.collectAsStateWithLifecycle()
@@ -122,6 +126,10 @@ class MainActivity : ComponentActivity() {
                                         IconButton(onClick = vm::undo, enabled = state.canUndo) {
                                             Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo last swipe")
                                         }
+                                        // Same as swiping right: the card flies off and the story is saved.
+                                        IconButton(onClick = deck::saveTop, enabled = state.visibleDeck.isNotEmpty()) {
+                                            Icon(Icons.Filled.FavoriteBorder, contentDescription = "Save story")
+                                        }
                                     }
                                 },
                             )
@@ -133,12 +141,11 @@ class MainActivity : ComponentActivity() {
                                 state = state,
                                 onSwipeLeft = vm::swipeLeft,
                                 onSwipeRight = vm::swipeRight,
-                                // "Next" moves on without saving, the same as skipping.
-                                onNext = vm::swipeLeft,
                                 onRetry = vm::loadMore,
                                 onOpenSubreddits = { screen = Screen.Subreddits },
                                 onBodyZoom = vm::setBodyZoom,
                                 onReadMode = vm::setReadMode,
+                                controller = deck,
                                 modifier = content,
                             )
                             Screen.Saved -> SavedScreen(
