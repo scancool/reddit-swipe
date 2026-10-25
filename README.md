@@ -46,8 +46,9 @@ the same release key. The key lives outside this repo in `../reddit-swipe-signin
 ## Code map
 - `app/src/main/java/com/redditswipe/data/RedditRepository.kt`: fetches listings and keeps only story-length text posts, flagging NSFW ones
 - `SwipeViewModel.kt`: the card deck, saved list, NSFW setting, and the subreddits to pull from (edit `storySubreddits` / `nsfwSubreddits`)
-- `ui/SwipeCard.kt`: draggable card with tilt, SAVE/SKIP labels and fly-out animation
-- `ui/SwipeScreen.kt`: card stack plus skip/save buttons
+- `ui/SwipeCard.kt`: the story card (typography, SAVE/SKIP stamps) and `CardSwipeState` (swipe thresholds and decisions)
+- `ui/SwipeScreen.kt`: card stack, drag/fling gestures, exit animations, skip/save buttons and the Next zone
+- `ui/FeedEndCard.kt`: what sits under the last card: loading placeholder, error, no subreddits, or end of feed
 - `ui/SavedScreen.kt`: saved posts; tap one to open it on Reddit
 
 ## Reddit relay (`relay/`)

@@ -36,6 +36,10 @@ data class SwipeUiState(
     val stats: Map<String, DayStats> = emptyMap(),
     val canUndo: Boolean = false,
     val isLoading: Boolean = false,
+    // False until the saved deck has been read from disk, so the screen doesn't flash "caught up" at launch.
+    val isRestored: Boolean = false,
+    // The last fetch worked but every subreddit had nothing new.
+    val isExhausted: Boolean = false,
     val isDownloading: Boolean = false,
     val error: String? = null,
     val isCheckingSubreddit: Boolean = false,
@@ -83,6 +87,7 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
                     deck = (loaded.first + state.deck).distinctBy { it.id }.filter { state.allows(it) },
                     saved = loaded.second,
                     stats = loaded.third,
+                    isRestored = true,
                 )
             }
             restored = true
@@ -214,10 +219,16 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadMore() {
         if (_state.value.isLoading) return
-        _state.update { it.copy(isLoading = true, error = null) }
+        _state.update { it.copy(isLoading = true, error = null, isExhausted = false) }
         viewModelScope.launch {
             val error = fetchRound()
-            _state.update { it.copy(isLoading = false, error = error) }
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    error = error.takeUnless { e -> e == NO_NEW_STORIES },
+                    isExhausted = error == NO_NEW_STORIES,
+                )
+            }
         }
     }
 
@@ -249,7 +260,7 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
             state.copy(deck = (state.deck + fresh).take(MAX_DECK))
         }
         if (added > 0) null
-        else results.firstNotNullOfOrNull { it.exceptionOrNull()?.message } ?: "No new stories found"
+        else results.firstNotNullOfOrNull { it.exceptionOrNull()?.message } ?: NO_NEW_STORIES
     }
 
     /** Saves to disk shortly after things change; the deck is large, so it waits longer. */
@@ -319,6 +330,7 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         private const val MAX_DECK = 1000
         private const val MAX_SEEN = 5000
         private const val OFFLINE_ROUNDS = 3
+        private const val NO_NEW_STORIES = "No new stories found"
         // A card left open longer than this (phone set down) only counts this much.
         private const val MAX_READING_MS = 20 * 60 * 1000L
     }

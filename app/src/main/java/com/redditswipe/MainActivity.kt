@@ -136,6 +136,7 @@ class MainActivity : ComponentActivity() {
                                 // "Next" moves on without saving, the same as skipping.
                                 onNext = vm::swipeLeft,
                                 onRetry = vm::loadMore,
+                                onOpenSubreddits = { screen = Screen.Subreddits },
                                 modifier = content,
                             )
                             Screen.Saved -> SavedScreen(

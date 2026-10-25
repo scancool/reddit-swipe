@@ -15,12 +15,11 @@ data class RedditPost(
 ) {
     val url: String get() = "https://www.reddit.com$permalink"
 
-    /** Estimated reading time at about 230 words per minute. */
-    val readMinutes: Int
-        get() {
-            val words = "$title $body".split(WHITESPACE).count { it.isNotEmpty() }
-            return maxOf(1, (words + 115) / 230)
-        }
+    /** Estimated reading time at about 230 words per minute; computed once, since cards redraw often. */
+    val readMinutes: Int by lazy {
+        val words = "$title $body".split(WHITESPACE).count { it.isNotEmpty() }
+        maxOf(1, (words + 115) / 230)
+    }
 
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)
