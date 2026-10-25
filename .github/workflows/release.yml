@@ -1,0 +1,40 @@
+name: Release
+
+# Push a tag like v0.2 to publish a signed APK; installed apps pick it up as an update.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Restore signing key
+        run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/release.p12"
+
+      - name: Build signed APK
+        env:
+          SIGNING_KEYSTORE: ${{ runner.temp }}/release.p12
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gradle assembleRelease -PappVersion="$VERSION"
+          cp app/build/outputs/apk/release/app-release.apk "RedditSwipe-$VERSION.apk"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "RedditSwipe-${GITHUB_REF_NAME#v}.apk" --title "$GITHUB_REF_NAME" --generate-notes
