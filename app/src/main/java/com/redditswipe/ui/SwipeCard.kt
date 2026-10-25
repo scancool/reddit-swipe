@@ -34,16 +34,27 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** Horizontal offset of the top card, shared by the drag gesture and the buttons. */
-class CardSwipeState(private val widthPx: Float) {
+/** Offset of the top card, shared by the drag gestures and the buttons. */
+class CardSwipeState(private val widthPx: Float, private val heightPx: Float) {
     val offsetX = Animatable(0f)
+    val offsetY = Animatable(0f)
     private val threshold get() = widthPx * 0.3f
+    private val upThreshold get() = heightPx * 0.12f
 
     /** -1..1, how far the card has been dragged toward a decision. */
     val progress: Float get() = (offsetX.value / threshold).coerceIn(-1f, 1f)
 
     suspend fun flyOut(right: Boolean) {
         offsetX.animateTo(if (right) widthPx * 1.5f else -widthPx * 1.5f, tween(250))
+    }
+
+    suspend fun flyUp() {
+        offsetY.animateTo(-heightPx * 1.2f, tween(250))
+    }
+
+    /** Moves the card up with the finger; it never goes below its resting place. */
+    suspend fun dragUp(dy: Float) {
+        offsetY.snapTo((offsetY.value + dy).coerceAtMost(0f))
     }
 
     /** Returns true for right, false for left, null if the card snapped back. */
@@ -55,6 +66,17 @@ class CardSwipeState(private val widthPx: Float) {
         } else {
             offsetX.animateTo(0f)
             null
+        }
+    }
+
+    /** Returns true if the card was pushed up far enough to move on to the next story. */
+    suspend fun settleUp(): Boolean {
+        return if (-offsetY.value > upThreshold) {
+            flyUp()
+            true
+        } else {
+            offsetY.animateTo(0f)
+            false
         }
     }
 }
@@ -70,7 +92,7 @@ fun SwipeCard(
     var cardModifier = modifier
     if (swipeState != null) {
         cardModifier = cardModifier
-            .offset { IntOffset(swipeState.offsetX.value.roundToInt(), 0) }
+            .offset { IntOffset(swipeState.offsetX.value.roundToInt(), swipeState.offsetY.value.roundToInt()) }
             .graphicsLayer { rotationZ = swipeState.offsetX.value / 40f }
             .pointerInput(post.id) {
                 detectHorizontalDragGestures(

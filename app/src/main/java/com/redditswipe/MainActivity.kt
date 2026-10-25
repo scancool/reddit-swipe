@@ -126,6 +126,8 @@ class MainActivity : ComponentActivity() {
                                 state = state,
                                 onSwipeLeft = vm::swipeLeft,
                                 onSwipeRight = vm::swipeRight,
+                                // "Next" moves on without saving, the same as skipping.
+                                onNext = vm::swipeLeft,
                                 onRetry = vm::loadMore,
                                 modifier = Modifier.padding(padding),
                             )

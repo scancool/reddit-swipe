@@ -9,6 +9,7 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 - One card on screen at a time showing a Reddit text post (title + body, subreddit, score).
 - Swipe right: save / like.
 - Swipe left: skip.
+- Swipe up (or tap) on "Next" between the ✕ and ♥ buttons: move on to the next story.
 - Only story-length text posts (300+ characters) from story subreddits like TrueOffMyChest, tifu and AITAH; no question subs where the content is in the comments.
 - NSFW stories can be switched on or off in the ☰ menu.
 
