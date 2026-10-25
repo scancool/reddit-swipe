@@ -11,12 +11,15 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 - Swipe left: skip.
 - Swipe up (or tap) on "Next" between the ✕ and ♥ buttons: move on to the next story.
 - Only story-length text posts (300+ characters) from story subreddits like TrueOffMyChest, tifu and AITAH; no question subs where the content is in the comments.
-- NSFW stories can be switched on or off in the ☰ menu.
+- ↶ in the top bar undoes the last swipe (up to 30).
+- ☰ menu: Swipe, Saved, Subreddits (add/remove), Stats (stories and minutes read per day), Settings
+  (text size, serif font, NSFW stories, download stories for offline reading).
+- Saved posts, swiped history (so stories don't repeat), the unread deck (offline cache) and stats are kept on the phone.
 
 ## Stack
 - Kotlin + Jetpack Compose (Material 3), minSdk 26, targetSdk 35
 - Reddit's official API, reached through a small Cloudflare Worker relay (`relay/`) that keeps the Reddit app secret off the phone
-- No database yet: saved posts live in memory and are lost when the app is closed
+- Local storage: JSON files in the app's private folder plus SharedPreferences for settings (`data/LocalStore.kt`)
 
 ## Building on GitHub
 - Every push to `main` builds a debug APK (Actions → Build → artifact `RedditSwipe-debug`).

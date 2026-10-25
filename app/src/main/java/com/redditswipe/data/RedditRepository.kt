@@ -17,30 +17,42 @@ class RedditRepository {
     // Pagination cursor per subreddit, so each fetch returns new posts.
     private val afterTokens = mutableMapOf<String, String?>()
 
-    suspend fun fetchTextPosts(subreddit: String, limit: Int = 50): List<RedditPost> =
-        withContext(Dispatchers.IO) {
-            val after = afterTokens[subreddit]
-            val query = buildString {
-                append("limit=").append(limit)
-                if (after != null) append("&after=").append(URLEncoder.encode(after, "UTF-8"))
-            }
-            val url = URL("${BuildConfig.RELAY_URL}/r/$subreddit/hot?$query")
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 10_000
-                readTimeout = 10_000
-            }
-            try {
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw RedditException("r/$subreddit returned HTTP ${connection.responseCode}")
-                }
-                val json = connection.inputStream.bufferedReader().use { it.readText() }
-                val data = JSONObject(json).getJSONObject("data")
-                afterTokens[subreddit] = data.optString("after").takeIf { it.isNotEmpty() && it != "null" }
-                parseTextPosts(data)
-            } finally {
-                connection.disconnect()
-            }
+    suspend fun fetchTextPosts(subreddit: String, limit: Int = 50): List<RedditPost> {
+        val (posts, after) = fetchListing(subreddit, limit, afterTokens[subreddit])
+        afterTokens[subreddit] = after
+        return posts
+    }
+
+    /** Returns the stories on the first page of [subreddit], without moving its cursor. */
+    suspend fun checkSubreddit(subreddit: String): List<RedditPost> =
+        fetchListing(subreddit, 50, after = null).first
+
+    private suspend fun fetchListing(
+        subreddit: String,
+        limit: Int,
+        after: String?,
+    ): Pair<List<RedditPost>, String?> = withContext(Dispatchers.IO) {
+        val query = buildString {
+            append("limit=").append(limit)
+            if (after != null) append("&after=").append(URLEncoder.encode(after, "UTF-8"))
         }
+        val url = URL("${BuildConfig.RELAY_URL}/r/$subreddit/hot?$query")
+        val connection = (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000
+            readTimeout = 10_000
+        }
+        try {
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                throw RedditException("r/$subreddit returned HTTP ${connection.responseCode}")
+            }
+            val json = connection.inputStream.bufferedReader().use { it.readText() }
+            val data = JSONObject(json).getJSONObject("data")
+            val next = data.optString("after").takeIf { it.isNotEmpty() && it != "null" }
+            parseTextPosts(data) to next
+        } finally {
+            connection.disconnect()
+        }
+    }
 
     private fun parseTextPosts(data: JSONObject): List<RedditPost> {
         val children = data.getJSONArray("children")

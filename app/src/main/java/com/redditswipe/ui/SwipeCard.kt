@@ -25,10 +25,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.offset
+import com.redditswipe.ReadingSettings
 import com.redditswipe.data.RedditPost
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -86,8 +88,16 @@ fun SwipeCard(
     post: RedditPost,
     swipeState: CardSwipeState?,
     onSwiped: (right: Boolean) -> Unit,
+    reading: ReadingSettings,
     modifier: Modifier = Modifier,
 ) {
+    val fontFamily = if (reading.serif) FontFamily.Serif else FontFamily.Default
+    val titleStyle = MaterialTheme.typography.titleLarge.let {
+        it.copy(fontSize = it.fontSize * reading.textScale, lineHeight = it.lineHeight * reading.textScale, fontFamily = fontFamily)
+    }
+    val bodyStyle = MaterialTheme.typography.bodyLarge.let {
+        it.copy(fontSize = it.fontSize * reading.textScale, lineHeight = it.lineHeight * reading.textScale, fontFamily = fontFamily)
+    }
     val scope = rememberCoroutineScope()
     var cardModifier = modifier
     if (swipeState != null) {
@@ -133,11 +143,7 @@ fun SwipeCard(
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    post.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Text(post.title, style = titleStyle, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(12.dp))
                 Column(
                     Modifier
@@ -146,12 +152,12 @@ fun SwipeCard(
                         .verticalScroll(rememberScrollState()),
                 ) {
                     if (post.body.isNotBlank()) {
-                        Text(post.body, style = MaterialTheme.typography.bodyLarge)
+                        Text(post.body, style = bodyStyle)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "▲ ${post.score}  ·  ${post.numComments} comments  ·  u/${post.author}",
+                    "${post.readMinutes} min read  ·  ▲ ${post.score}  ·  ${post.numComments} comments",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -65,6 +65,7 @@ fun SwipeScreen(
                                 post = next,
                                 swipeState = null,
                                 onSwiped = {},
+                                reading = state.reading,
                                 modifier = Modifier.graphicsLayer { scaleX = 0.95f; scaleY = 0.95f },
                             )
                         }
@@ -74,6 +75,7 @@ fun SwipeScreen(
                             post = top,
                             swipeState = swipeState,
                             onSwiped = { right -> if (right) onSwipeRight(top) else onSwipeLeft(top) },
+                            reading = state.reading,
                         )
                     }
                 }
