@@ -138,6 +138,7 @@ class MainActivity : ComponentActivity() {
                                 onRetry = vm::loadMore,
                                 onOpenSubreddits = { screen = Screen.Subreddits },
                                 onBodyZoom = vm::setBodyZoom,
+                                onReadMode = vm::setReadMode,
                                 modifier = content,
                             )
                             Screen.Saved -> SavedScreen(

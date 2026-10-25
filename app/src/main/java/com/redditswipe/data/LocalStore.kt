@@ -36,6 +36,11 @@ class LocalStore(context: Context) {
         get() = prefs.getFloat("body_zoom", 1f)
         set(value) = prefs.edit().putFloat("body_zoom", value).apply()
 
+    /** Name of the [com.redditswipe.ReadMode] picked on the swipe screen. */
+    var readMode: String?
+        get() = prefs.getString("read_mode", null)
+        set(value) = prefs.edit().putString("read_mode", value).apply()
+
     var serif: Boolean
         get() = prefs.getBoolean("serif", false)
         set(value) = prefs.edit().putBoolean("serif", value).apply()

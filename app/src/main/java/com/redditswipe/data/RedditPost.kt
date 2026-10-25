@@ -15,6 +15,9 @@ data class RedditPost(
 ) {
     val url: String get() = "https://www.reddit.com$permalink"
 
+    /** From a subreddit of short posts (see [QUICK_READ_SUBREDDITS]) rather than a story subreddit. */
+    val isQuickRead: Boolean by lazy { isQuickReadSubreddit(subreddit) }
+
     /** Estimated reading time at about 230 words per minute; computed once, since cards redraw often. */
     val readMinutes: Int by lazy {
         val words = "$title $body".split(WHITESPACE).count { it.isNotEmpty() }

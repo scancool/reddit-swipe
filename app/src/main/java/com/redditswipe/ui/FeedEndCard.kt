@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.redditswipe.ReadMode
 import com.redditswipe.SwipeUiState
 
 /**
@@ -48,10 +49,18 @@ fun FeedEndCard(
     modifier: Modifier = Modifier,
 ) {
     when {
-        state.subreddits.isEmpty() -> MessageCard(
+        state.modeSubreddits.isEmpty() -> MessageCard(
             icon = Icons.Filled.Forum,
-            title = "Pick some subreddits",
-            detail = "Stories come from the subreddits you choose.",
+            title = when {
+                state.subreddits.isEmpty() -> "Pick some subreddits"
+                state.readMode == ReadMode.Quick -> "No quick-read subreddits"
+                else -> "No story subreddits"
+            },
+            detail = when {
+                state.subreddits.isEmpty() -> "Stories come from the subreddits you choose."
+                state.readMode == ReadMode.Quick -> "Add one like r/Showerthoughts from the Quick reads list."
+                else -> "Add a story subreddit like r/tifu, or switch to Mixed."
+            },
             action = "Choose subreddits",
             onAction = onOpenSubreddits,
             modifier = modifier,

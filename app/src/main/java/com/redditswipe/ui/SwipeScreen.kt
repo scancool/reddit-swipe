@@ -27,9 +27,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +60,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import com.redditswipe.ReadMode
 import com.redditswipe.ReadingSettings
 import com.redditswipe.SwipeUiState
 import com.redditswipe.data.RedditPost
@@ -92,12 +97,14 @@ fun SwipeScreen(
     onRetry: () -> Unit,
     onOpenSubreddits: () -> Unit,
     onBodyZoom: (Float) -> Unit,
+    onReadMode: (ReadMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val view = LocalView.current
     val density = LocalDensity.current
-    val top = state.deck.firstOrNull()
-    val next = state.deck.getOrNull(1)
+    val deck = state.visibleDeck
+    val top = deck.firstOrNull()
+    val next = deck.getOrNull(1)
 
     var slotSize by remember { mutableStateOf(IntSize.Zero) }
     val maxCardWidthPx = with(density) { MaxCardWidth.toPx() }
@@ -155,6 +162,7 @@ fun SwipeScreen(
     }
 
     Column(modifier.fillMaxSize().padding(16.dp)) {
+        ReadModeSwitch(state.readMode, onReadMode, Modifier.align(Alignment.CenterHorizontally).padding(bottom = 12.dp))
         Box(
             Modifier.weight(1f).fillMaxWidth().onSizeChanged { slotSize = it },
             contentAlignment = Alignment.Center,
@@ -230,6 +238,25 @@ fun SwipeScreen(
                 emphasis = { swipeState.progress.coerceAtLeast(0f) },
                 onClick = { top?.let { commit(it, Exit.Right, 0f) } },
             ) { Icon(Icons.Filled.Favorite, contentDescription = "Save") }
+        }
+    }
+}
+
+/** Quick reads | Mixed | Long reads, centered above the deck and no wider than a card. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReadModeSwitch(mode: ReadMode, onChange: (ReadMode) -> Unit, modifier: Modifier = Modifier) {
+    SingleChoiceSegmentedButtonRow(modifier.widthIn(max = MaxCardWidth).fillMaxWidth()) {
+        ReadMode.entries.forEachIndexed { index, entry ->
+            SegmentedButton(
+                selected = entry == mode,
+                onClick = { onChange(entry) },
+                shape = SegmentedButtonDefaults.itemShape(index, ReadMode.entries.size),
+                // No checkmark: it would squeeze the labels on narrow phones, and the fill already shows the choice.
+                icon = {},
+                label = { Text(entry.label, maxLines = 1) },
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }

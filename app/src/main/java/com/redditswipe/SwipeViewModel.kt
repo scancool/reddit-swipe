@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.redditswipe.data.DayStats
 import com.redditswipe.data.LocalStore
 import com.redditswipe.data.QUICK_READ_SUBREDDITS
+import com.redditswipe.data.isQuickReadSubreddit
 import com.redditswipe.data.RedditPost
 import com.redditswipe.data.RedditRepository
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +26,26 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
+
+/** Which stories the swipe screen deals: short posts, long stories, or both mixed together. */
+enum class ReadMode(val label: String) {
+    Quick("Quick reads"),
+    Mixed("Mixed"),
+    Long("Long reads"),
+    ;
+
+    fun allows(post: RedditPost) = when (this) {
+        Quick -> post.isQuickRead
+        Mixed -> true
+        Long -> !post.isQuickRead
+    }
+
+    fun allowsSubreddit(name: String) = when (this) {
+        Quick -> isQuickReadSubreddit(name)
+        Mixed -> true
+        Long -> !isQuickReadSubreddit(name)
+    }
+}
 
 data class ReadingSettings(val textScale: Float = 1f, val serif: Boolean = false, val bodyZoom: Float = 1f)
 
@@ -45,7 +66,14 @@ data class SwipeUiState(
     val error: String? = null,
     val isCheckingSubreddit: Boolean = false,
     val subredditError: String? = null,
-)
+    val readMode: ReadMode = ReadMode.Mixed,
+) {
+    /** The cards the swipe screen shows: the deck narrowed to the current [readMode]. */
+    val visibleDeck: List<RedditPost> get() = if (readMode == ReadMode.Mixed) deck else deck.filter(readMode::allows)
+
+    /** The subreddits that can supply cards in the current [readMode]. */
+    val modeSubreddits: List<String> get() = subreddits.filter(readMode::allowsSubreddit)
+}
 
 @OptIn(FlowPreview::class)
 class SwipeViewModel(app: Application) : AndroidViewModel(app) {
@@ -58,6 +86,7 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
             subreddits = store.subreddits ?: DEFAULT_SUBREDDITS,
             showNsfw = store.showNsfw,
             reading = ReadingSettings(store.textScale, store.serif, store.bodyZoom),
+            readMode = ReadMode.entries.firstOrNull { it.name == store.readMode } ?: ReadMode.Mixed,
         ),
     )
     val state: StateFlow<SwipeUiState> = _state.asStateFlow()
@@ -143,6 +172,12 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         if (show) loadMore() else refillIfLow()
     }
 
+    fun setReadMode(mode: ReadMode) {
+        store.readMode = mode.name
+        _state.update { it.copy(readMode = mode, error = null, isExhausted = false) }
+        refillIfLow()
+    }
+
     fun setTextScale(scale: Float) {
         store.textScale = scale
         _state.update { it.copy(reading = it.reading.copy(textScale = scale)) }
@@ -220,14 +255,14 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun refillIfLow() {
-        if (restored && _state.value.deck.size < 5) loadMore()
+        if (restored && _state.value.visibleDeck.size < 5) loadMore()
     }
 
     fun loadMore() {
         if (_state.value.isLoading) return
         _state.update { it.copy(isLoading = true, error = null, isExhausted = false) }
         viewModelScope.launch {
-            val error = fetchRound()
+            val error = fetchRound(_state.value.readMode)
             _state.update {
                 it.copy(
                     isLoading = false,
@@ -243,15 +278,18 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.isDownloading) return
         _state.update { it.copy(isDownloading = true) }
         viewModelScope.launch {
-            repeat(OFFLINE_ROUNDS) { fetchRound() }
+            repeat(OFFLINE_ROUNDS) { fetchRound(ReadMode.Mixed) }
             _state.update { it.copy(isDownloading = false) }
             persistAll(_state.value)
         }
     }
 
-    /** Adds one page from each subreddit to the deck; returns an error message if nothing came back. */
-    private suspend fun fetchRound(): String? = fetchMutex.withLock {
-        val subreddits = _state.value.subreddits
+    /**
+     * Adds one page from each subreddit that suits [mode] to the deck; returns an error message if
+     * nothing came back.
+     */
+    private suspend fun fetchRound(mode: ReadMode): String? = fetchMutex.withLock {
+        val subreddits = _state.value.subreddits.filter(mode::allowsSubreddit)
         if (subreddits.isEmpty()) return "Add some subreddits in the menu"
         val results = subreddits.map { sub ->
             viewModelScope.async { runCatching { repository.fetchTextPosts(sub, limit = 25) } }

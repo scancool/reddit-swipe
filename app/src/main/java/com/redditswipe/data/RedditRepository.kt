@@ -49,8 +49,7 @@ class RedditRepository {
             val json = connection.inputStream.bufferedReader().use { it.readText() }
             val data = JSONObject(json).getJSONObject("data")
             val next = data.optString("after").takeIf { it.isNotEmpty() && it != "null" }
-            val quickRead = QUICK_READ_SUBREDDITS.any { it.equals(subreddit, ignoreCase = true) }
-            parseTextPosts(data, quickRead) to next
+            parseTextPosts(data, isQuickReadSubreddit(subreddit)) to next
         } finally {
             connection.disconnect()
         }
@@ -94,5 +93,7 @@ val QUICK_READ_SUBREDDITS = listOf(
     "Jokes",
     "DadJokes",
 )
+
+fun isQuickReadSubreddit(name: String) = QUICK_READ_SUBREDDITS.any { it.equals(name, ignoreCase = true) }
 
 class RedditException(message: String) : Exception(message)
