@@ -10,7 +10,7 @@ import java.net.URLEncoder
 
 /**
  * Fetches subreddit listings through the relay Worker (see /relay), which calls Reddit's
- * official API, and keeps only text (self) posts.
+ * official API, and keeps only story-length text (self) posts.
  */
 class RedditRepository {
 
@@ -46,23 +46,28 @@ class RedditRepository {
         val children = data.getJSONArray("children")
         return (0 until children.length()).mapNotNull { i ->
             val post = children.getJSONObject(i).getJSONObject("data")
-            val isText = post.optBoolean("is_self") &&
+            val body = post.optString("selftext")
+            val isStory = post.optBoolean("is_self") &&
                 !post.optBoolean("is_video") &&
-                !post.optBoolean("over_18") &&
-                !post.optBoolean("stickied")
-            if (!isText) return@mapNotNull null
+                !post.optBoolean("stickied") &&
+                body.length >= MIN_BODY_LENGTH
+            if (!isStory) return@mapNotNull null
             RedditPost(
                 id = post.getString("id"),
                 subreddit = post.getString("subreddit"),
                 title = post.getString("title"),
-                body = post.optString("selftext"),
+                body = body,
                 author = post.optString("author"),
                 score = post.optInt("score"),
                 numComments = post.optInt("num_comments"),
                 permalink = post.getString("permalink"),
+                isNsfw = post.optBoolean("over_18"),
             )
         }
     }
 }
+
+// Shorter posts are usually questions whose answers live in the comments.
+private const val MIN_BODY_LENGTH = 300
 
 class RedditException(message: String) : Exception(message)

@@ -9,6 +9,7 @@ data class RedditPost(
     val score: Int,
     val numComments: Int,
     val permalink: String,
+    val isNsfw: Boolean,
 ) {
     val url: String get() = "https://www.reddit.com$permalink"
 }

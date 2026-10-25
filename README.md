@@ -9,7 +9,8 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 - One card on screen at a time showing a Reddit text post (title + body, subreddit, score).
 - Swipe right: save / like.
 - Swipe left: skip.
-- Image, video and link posts are filtered out; only self/text posts are shown.
+- Only story-length text posts (300+ characters) from story subreddits like TrueOffMyChest, tifu and AITAH; no question subs where the content is in the comments.
+- NSFW stories can be switched on or off in the ☰ menu.
 
 ## Stack
 - Kotlin + Jetpack Compose (Material 3), minSdk 26, targetSdk 35
@@ -39,8 +40,8 @@ the same release key. The key lives outside this repo in `../reddit-swipe-signin
 3. Plug in your phone with USB debugging on (or start an emulator) and press **Run**.
 
 ## Code map
-- `app/src/main/java/com/redditswipe/data/RedditRepository.kt`: fetches listings and keeps only text posts (no images, videos, links, NSFW or pinned posts)
-- `SwipeViewModel.kt`: the card deck, saved list, and the subreddits to pull from (edit `subreddits` to change them)
+- `app/src/main/java/com/redditswipe/data/RedditRepository.kt`: fetches listings and keeps only story-length text posts, flagging NSFW ones
+- `SwipeViewModel.kt`: the card deck, saved list, NSFW setting, and the subreddits to pull from (edit `storySubreddits` / `nsfwSubreddits`)
 - `ui/SwipeCard.kt`: draggable card with tilt, SAVE/SKIP labels and fly-out animation
 - `ui/SwipeScreen.kt`: card stack plus skip/save buttons
 - `ui/SavedScreen.kt`: saved posts; tap one to open it on Reddit
