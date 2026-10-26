@@ -53,6 +53,11 @@ class LocalStore(context: Context) {
         get() = prefs.getBoolean("swipe_hint_done", false)
         set(value) = prefs.edit().putBoolean("swipe_hint_done", value).apply()
 
+    /** Translate cards that aren't in the phone's language. */
+    var translateCards: Boolean
+        get() = prefs.getBoolean("translate_cards", true)
+        set(value) = prefs.edit().putBoolean("translate_cards", value).apply()
+
     var serif: Boolean
         get() = prefs.getBoolean("serif", false)
         set(value) = prefs.edit().putBoolean("serif", value).apply()

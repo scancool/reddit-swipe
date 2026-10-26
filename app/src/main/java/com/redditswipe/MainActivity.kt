@@ -159,6 +159,7 @@ class MainActivity : ComponentActivity() {
                                         onOpenNews = { screen = Screen.News },
                                         onTextScale = vm::setTextScale,
                                         onReadMode = vm::setReadMode,
+                                        onToggleOriginal = vm::toggleOriginal,
                                         modifier = content,
                                     )
                                     Screen.Saved -> SavedScreen(
@@ -202,6 +203,9 @@ class MainActivity : ComponentActivity() {
                                         onSerif = vm::setSerif,
                                         storyMode = state.storyMode,
                                         onStoryMode = vm::setStoryMode,
+                                        translateCards = state.translateCards,
+                                        translationTarget = vm.translationTarget,
+                                        onTranslateCards = vm::setTranslateCards,
                                         onShowNsfw = vm::setShowNsfw,
                                         onDownload = vm::downloadForOffline,
                                         modifier = content,

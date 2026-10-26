@@ -8,6 +8,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -65,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.redditswipe.ReadingSettings
 import com.redditswipe.data.RedditPost
+import com.redditswipe.translate.CardTranslation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -170,7 +172,9 @@ fun backScale(dragProgress: Float): Float = BACK_SCALE + (1f - BACK_SCALE) * dra
  * Both are read only while drawing, so a moving card never recomposes or re-lays-out its text.
  * With [onTextScale], pinching with two fingers resizes the card's text (the same size Settings shows)
  * and reports it when the fingers lift. [onOpen] adds a link to the full article under news cards; it
- * opens on a long press, so a stray tap never takes the reader out of the app.
+ * opens on a long press, so a stray tap never takes the reader out of the app. With a [translation],
+ * the card shows it (unless [showOriginal]) under a line saying which language it came from; tapping
+ * that line calls [onToggleOriginal].
  */
 @Composable
 fun SwipeCard(
@@ -181,7 +185,13 @@ fun SwipeCard(
     transform: GraphicsLayerScope.() -> Unit = {},
     onTextScale: ((Float) -> Unit)? = null,
     onOpen: (() -> Unit)? = null,
+    translation: CardTranslation? = null,
+    showOriginal: Boolean = false,
+    onToggleOriginal: (() -> Unit)? = null,
 ) {
+    val translated = translation?.takeIf { it.isReady && !showOriginal }
+    val title = translated?.title ?: post.title
+    val body = translated?.body ?: post.body
     val colors = MaterialTheme.colorScheme
     val isShort = post.body.length < SHORT_POST_CHARS
     val fontFamily = if (reading.serif) FontFamily.Serif else FontFamily.Default
@@ -246,6 +256,28 @@ fun SwipeCard(
     ) {
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
             Text(header, style = typography.labelLarge)
+            if (translation != null) {
+                val language = translation.sourceLanguageName
+                Text(
+                    when {
+                        !translation.isReady -> "Translating from $language…"
+                        showOriginal -> "Original in $language  ·  Show translation"
+                        else -> "Translated from $language  ·  Show original"
+                    },
+                    style = typography.labelMedium,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier
+                        .padding(top = 2.dp)
+                        .then(
+                            if (onToggleOriginal != null && translation.isReady) {
+                                Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onToggleOriginal)
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .padding(vertical = 4.dp),
+                )
+            }
             Box(
                 Modifier
                     .weight(1f)
@@ -269,9 +301,9 @@ fun SwipeCard(
                 contentAlignment = if (isShort) Alignment.Center else Alignment.TopStart,
             ) {
                 Column(Modifier.fillMaxWidth().verticalScroll(scroll)) {
-                    Text(post.title, style = titleStyle)
-                    if (post.body.isNotBlank()) {
-                        Text(post.body, style = bodyStyle, modifier = Modifier.padding(top = 14.dp))
+                    Text(title, style = titleStyle)
+                    if (body.isNotBlank()) {
+                        Text(body, style = bodyStyle, modifier = Modifier.padding(top = 14.dp))
                     }
                 }
                 if (pinching) {

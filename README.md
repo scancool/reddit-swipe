@@ -18,6 +18,9 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
   (`NEWS_FEEDS` in `data/NewsRepository.kt`). Sites marked "full" send whole articles; the rest send a headline and
   summary with a "Hold for full article ↗" link (a long press, so a stray tap never leaves the app). Feeds are read straight from the publishers.
 - A News / Stories switch above the cards picks what to deal; Settings picks the story length (All, Quick or Long).
+- Cards in another language than the phone's are translated on the phone with Google ML Kit (`translate/CardTranslator.kt`):
+  the top two cards are done ahead of time, each language's model downloads once (~30 MB) and then works offline, and
+  "Show original" on the card flips back. Settings can turn it off.
 - Text size is one setting: pinch a card with two fingers or use A−/A+ in Settings.
 - Removing a saved post shows an Undo.
 - ↶ at the top left undoes the last swipe (up to 30).
