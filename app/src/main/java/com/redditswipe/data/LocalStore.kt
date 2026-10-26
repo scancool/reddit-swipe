@@ -48,7 +48,7 @@ class LocalStore(context: Context) {
         get() = prefs.getString("story_mode", null)
         set(value) = prefs.edit().putString("story_mode", value).apply()
 
-    /** True once the user has swiped a card, after which the "← Skip · Save →" hint stays hidden. */
+    /** True once the user has swiped a card, after which the "← Skip · Like →" hint stays hidden. */
     var swipeHintDone: Boolean
         get() = prefs.getBoolean("swipe_hint_done", false)
         set(value) = prefs.edit().putBoolean("swipe_hint_done", value).apply()

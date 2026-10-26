@@ -166,7 +166,7 @@ fun backScale(dragProgress: Float): Float = BACK_SCALE + (1f - BACK_SCALE) * dra
 
 /**
  * One story card. It is purely visual: position, tilt, scale and shadow come from [transform], which
- * runs in the card's single graphics layer, and [decision] (-1..1) fades in the SAVE/SKIP stamps.
+ * runs in the card's single graphics layer, and [decision] (-1..1) fades in the LIKE/SKIP stamps.
  * Both are read only while drawing, so a moving card never recomposes or re-lays-out its text.
  * With [onTextScale], pinching with two fingers resizes the card's text (the same size Settings shows)
  * and reports it when the fingers lift. [onOpen] adds a link to the full article under news cards; it
@@ -331,7 +331,7 @@ private fun footerText(post: RedditPost, isShort: Boolean): String {
 }
 
 /**
- * A color wash from the edge the card is heading toward, plus SAVE (top left, while dragging right)
+ * A color wash from the edge the card is heading toward, plus LIKE (top left, while dragging right)
  * and SKIP (top right, while dragging left) stamps. All of it sits in its own layer, so redrawing it
  * every drag frame doesn't re-record the story text underneath.
  */
@@ -347,7 +347,7 @@ private fun DecisionStamps(decision: () -> Float) {
             .drawBehind { drawDecisionTint(decision(), save, skip) }
             .padding(28.dp),
     ) {
-        Stamp("SAVE", save, -12f, Modifier.align(Alignment.TopStart)) { decision().coerceAtLeast(0f) }
+        Stamp("LIKE", save, -12f, Modifier.align(Alignment.TopStart)) { decision().coerceAtLeast(0f) }
         Stamp("SKIP", skip, 12f, Modifier.align(Alignment.TopEnd)) { (-decision()).coerceAtLeast(0f) }
     }
 }

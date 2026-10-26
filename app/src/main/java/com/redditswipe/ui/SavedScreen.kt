@@ -27,7 +27,7 @@ fun SavedScreen(
 ) {
     if (saved.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Swipe right on a post to save it")
+            Text("Swipe right on a card to like it")
         }
         return
     }

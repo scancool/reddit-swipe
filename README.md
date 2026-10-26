@@ -8,7 +8,7 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 
 ## Core idea
 - One card on screen at a time showing a Reddit text post (title + body, subreddit, score).
-- Swipe right: save / like.
+- Swipe right: like (liked cards are kept under Liked in the menu).
 - Swipe left: skip. Until the first swipe, a hint under the card says which way does what.
 - Only story-length text posts (300+ characters) from story subreddits like TrueOffMyChest, tifu and AITAH; no question subs where the content is in the comments.
 - Quick-read subreddits (Showerthoughts, LifeProTips, YouShouldKnow, Jokes, DadJokes) keep short posts too, shown in larger centered type; add them from the chips on the Subreddits screen (`QUICK_READ_SUBREDDITS` in `data/RedditRepository.kt`).
@@ -17,15 +17,15 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
   Science & health and Sports. The News sources screen switches a whole category or single sites on and off
   (`NEWS_FEEDS` in `data/NewsRepository.kt`). Sites marked "full" send whole articles; the rest send a headline and
   summary with a "Hold for full article ↗" link (a long press, so a stray tap never leaves the app). Feeds are read straight from the publishers.
-- A News / Stories switch above the cards picks what to deal; Settings picks the story length (All, Quick or Long).
+- A News / Stories switch above the cards picks what to deal; the ☰ menu picks the story length (All, Quick or Long).
 - Text size is one setting: pinch a card with two fingers or use A−/A+ in Settings.
 - Removing a saved post shows an Undo.
 - ↶ at the top left undoes the last swipe (up to 30).
-- Menu screens (Saved, News sources, Subreddits, Stats, Settings) swipe away to the right to go back to the cards
+- Menu screens (Liked, News sources, Subreddits, Stats, Settings) swipe away to the right to go back to the cards
   (`ui/SwipeBack.kt`); Android's back gesture slides them the same way.
-- ☰ menu, top right: Swipe, Saved, News sources, Subreddits, Stats (stories and minutes read per day), Settings
+- ☰ menu, top right: Swipe, Liked, News sources, Subreddits, Stats (stories and minutes read per day), Settings
   (text size, serif font, NSFW stories, download stories for offline reading).
-- Saved posts, swiped history (so stories don't repeat), the unread deck (offline cache) and stats are kept on the phone.
+- Liked cards, swiped history (so stories don't repeat, crossposts and shared articles included), the unread deck (offline cache) and stats are kept on the phone.
 
 ## Stack
 - Kotlin + Jetpack Compose (Material 3), minSdk 26, targetSdk 35

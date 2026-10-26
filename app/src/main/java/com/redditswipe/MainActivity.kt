@@ -5,11 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Bookmarks
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Newspaper
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +26,9 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -63,7 +68,7 @@ import kotlinx.coroutines.launch
 
 enum class Screen(val title: String, val icon: ImageVector) {
     Swipe("Swipe", Icons.Filled.Style),
-    Saved("Saved", Icons.Filled.Bookmarks),
+    Saved("Liked", Icons.Filled.Favorite),
     News("News sources", Icons.Filled.Newspaper),
     Subreddits("Subreddits", Icons.Filled.Forum),
     Stats("Stats", Icons.Filled.BarChart),
@@ -124,6 +129,34 @@ class MainActivity : ComponentActivity() {
                                             modifier = Modifier.padding(horizontal = 12.dp),
                                         )
                                     }
+                                    HorizontalDivider(Modifier.padding(horizontal = 28.dp, vertical = 16.dp))
+                                    Text(
+                                        "Story length",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
+                                    )
+                                    // Picking a length opens Stories at that length.
+                                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                                        ReadMode.STORY_MODES.forEachIndexed { index, mode ->
+                                            SegmentedButton(
+                                                selected = mode == state.storyMode,
+                                                onClick = {
+                                                    vm.setReadMode(mode)
+                                                    screen = Screen.Swipe
+                                                    scope.launch { drawerState.close() }
+                                                },
+                                                shape = SegmentedButtonDefaults.itemShape(index, ReadMode.STORY_MODES.size),
+                                                label = { Text(mode.label) },
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        "Quick: short posts like shower thoughts. Long: full stories. All: both.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(start = 28.dp, end = 28.dp, top = 8.dp),
+                                    )
                                 }
                             }
                         },
@@ -180,7 +213,7 @@ class MainActivity : ComponentActivity() {
                                                         snackbar.currentSnackbarData?.dismiss()
                                                         scope.launch {
                                                             val result = snackbar.showSnackbar(
-                                                                "Removed from saved",
+                                                                "Removed from liked",
                                                                 actionLabel = "Undo",
                                                                 duration = SnackbarDuration.Short,
                                                             )
@@ -208,8 +241,6 @@ class MainActivity : ComponentActivity() {
                                                     isDownloading = state.isDownloading,
                                                     onTextScale = vm::setTextScale,
                                                     onSerif = vm::setSerif,
-                                                    storyMode = state.storyMode,
-                                                    onStoryMode = vm::setStoryMode,
                                                     onShowNsfw = vm::setShowNsfw,
                                                     onDownload = vm::downloadForOffline,
                                                 )

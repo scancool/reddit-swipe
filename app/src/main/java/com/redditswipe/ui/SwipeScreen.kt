@@ -185,7 +185,7 @@ fun SwipeScreen(
                             }
                             .semantics {
                                 customActions = listOf(
-                                    CustomAccessibilityAction("Save") { commit(post, Exit.Right, 0f); true },
+                                    CustomAccessibilityAction("Like") { commit(post, Exit.Right, 0f); true },
                                     CustomAccessibilityAction("Skip") { commit(post, Exit.Left, 0f); true },
                                 )
                             },
@@ -204,14 +204,14 @@ fun SwipeScreen(
                 }
             }
         }
-        // Until the first swipe, says what each direction does; the SAVE/SKIP stamps only show mid-drag.
+        // Until the first swipe, says what each direction does; the LIKE/SKIP stamps only show mid-drag.
         if (state.showSwipeHint && top != null) {
             Row(
                 Modifier.widthIn(max = MaxCardWidth).fillMaxWidth().align(Alignment.CenterHorizontally).padding(top = 12.dp),
             ) {
                 Text("← Swipe left to skip", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.weight(1f))
-                Text("Swipe right to save →", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Text("Swipe right to like →", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             }
         }
     }

@@ -142,7 +142,8 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
             }
             _state.update { state ->
                 state.copy(
-                    deck = (loaded.first + state.deck).distinctBy { it.id }.filter { state.allows(it) },
+                    // Older versions could store the same story twice; one copy is kept.
+                    deck = (loaded.first + state.deck).distinctBy { it.titleKey ?: it.id }.filter { state.allows(it) },
                     saved = loaded.second,
                     stats = loaded.third,
                     isRestored = true,
@@ -160,14 +161,14 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun swipe(post: RedditPost, save: Boolean) {
         val seconds = takeReadingSeconds()
-        seen.add(post.id)
+        seen.addAll(post.seenKeys)
         history.addLast(post to save)
         if (history.size > MAX_UNDO) history.removeFirst()
         if (_state.value.showSwipeHint) store.swipeHintDone = true
         _state.update {
             it.copy(
                 showSwipeHint = false,
-                deck = it.deck - post,
+                deck = it.deck.filterNot { card -> card.id == post.id },
                 saved = if (save) it.saved + post else it.saved,
                 canUndo = true,
                 stats = it.stats.adjustToday(stories = 1, seconds = seconds),
@@ -178,7 +179,7 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun undo() {
         val (post, wasSaved) = history.removeLastOrNull() ?: return
-        seen.remove(post.id)
+        seen.removeAll(post.seenKeys.toSet())
         _state.update {
             it.copy(
                 deck = listOf(post) + it.deck,
@@ -222,17 +223,6 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         refillIfLow()
-    }
-
-    /** Picks the story length (All, Quick or Long) in Settings; applies at once if Stories is showing. */
-    fun setStoryMode(mode: ReadMode) {
-        if (mode == ReadMode.News) return
-        if (_state.value.readMode == ReadMode.News) {
-            store.storyMode = mode.name
-            _state.update { it.copy(storyMode = mode) }
-        } else {
-            setReadMode(mode)
-        }
     }
 
     fun setTextScale(scale: Float) {
@@ -371,8 +361,11 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
 
         var added = 0
         _state.update { state ->
-            val inDeck = state.deck.mapTo(HashSet()) { it.id }
-            val fresh = posts.filter { it.id !in seen && it.id !in inDeck && state.allows(it) }
+            val inDeck = state.deck.flatMapTo(HashSet()) { it.seenKeys }
+            // Skips stories already read or dealt, and the same story arriving twice in this round.
+            val fresh = posts
+                .filter { post -> post.seenKeys.none { it in seen || it in inDeck } && state.allows(post) }
+                .distinctBy { it.titleKey ?: it.id }
             added = fresh.size
             state.copy(deck = (state.deck + fresh).take(MAX_DECK))
         }
@@ -447,7 +440,8 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         private val SUBREDDIT_NAME = Regex("[A-Za-z0-9_]{2,21}")
         private const val MAX_UNDO = 30
         private const val MAX_DECK = 1000
-        private const val MAX_SEEN = 5000
+        // Two keys per swiped story (ID and title), so about 5000 stories.
+        private const val MAX_SEEN = 10000
         private const val OFFLINE_ROUNDS = 3
         private const val NO_NEW_STORIES = "No new stories found"
         // A card left open longer than this (phone set down) only counts this much.

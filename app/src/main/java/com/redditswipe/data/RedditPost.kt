@@ -28,6 +28,19 @@ data class RedditPost(
     /** From a subreddit of short posts (see [QUICK_READ_SUBREDDITS]) rather than a story subreddit. */
     val isQuickRead: Boolean by lazy { !isNews && isQuickReadSubreddit(subreddit) }
 
+    /**
+     * Identifies the same story under another ID: a Reddit crosspost, or one article in two feeds (BBC News
+     * and BBC World often share stories). Google News adds " - Outlet" to titles, so that's left out. Null
+     * for titles too short to tell apart, such as "Update".
+     */
+    val titleKey: String? by lazy {
+        val text = if (isNews) title.substringBeforeLast(" - ") else title
+        text.lowercase().filter { it.isLetterOrDigit() }.takeIf { it.length >= 15 }?.let { "t:$it" }
+    }
+
+    /** Everything that marks this card as already read: its ID and, when there is one, its [titleKey]. */
+    val seenKeys: List<String> get() = listOfNotNull(id, titleKey)
+
     /** A news article published more than [NEWS_MAX_AGE_MS] ago; articles without a date never go stale. */
     fun isStaleNews(now: Long = System.currentTimeMillis()) =
         isNews && publishedAt > 0L && now - publishedAt > NEWS_MAX_AGE_MS
