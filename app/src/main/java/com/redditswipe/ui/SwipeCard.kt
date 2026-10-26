@@ -8,7 +8,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
@@ -47,9 +47,13 @@ import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -88,9 +92,9 @@ private val SnapBackSpring = spring<Float>(dampingRatio = 0.62f, stiffness = Spr
 // Posts this short read like one-liners (shower thoughts) and get larger, centered type.
 private const val SHORT_POST_CHARS = 280
 
-/** Limits for pinching the story text, relative to the size set in Settings. */
-private const val MIN_BODY_ZOOM = 0.7f
-private const val MAX_BODY_ZOOM = 2.5f
+/** Limits of the text size, whether pinched on a card or set in Settings. */
+const val MIN_TEXT_SCALE = 0.7f
+const val MAX_TEXT_SCALE = 2.5f
 
 /**
  * Position of the top card, moved by the drag gesture. Offsets are plain snapshot
@@ -164,8 +168,9 @@ fun backScale(dragProgress: Float): Float = BACK_SCALE + (1f - BACK_SCALE) * dra
  * One story card. It is purely visual: position, tilt, scale and shadow come from [transform], which
  * runs in the card's single graphics layer, and [decision] (-1..1) fades in the SAVE/SKIP stamps.
  * Both are read only while drawing, so a moving card never recomposes or re-lays-out its text.
- * With [onBodyZoom], pinching with two fingers resizes the story text (never the title) and reports
- * the new zoom when the fingers lift. [onOpen] adds a link to the full article under news cards.
+ * With [onTextScale], pinching with two fingers resizes the card's text (the same size Settings shows)
+ * and reports it when the fingers lift. [onOpen] adds a link to the full article under news cards; it
+ * opens on a long press, so a stray tap never takes the reader out of the app.
  */
 @Composable
 fun SwipeCard(
@@ -174,14 +179,18 @@ fun SwipeCard(
     modifier: Modifier = Modifier,
     decision: (() -> Float)? = null,
     transform: GraphicsLayerScope.() -> Unit = {},
-    onBodyZoom: ((Float) -> Unit)? = null,
+    onTextScale: ((Float) -> Unit)? = null,
     onOpen: (() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val isShort = post.body.length < SHORT_POST_CHARS
     val fontFamily = if (reading.serif) FontFamily.Serif else FontFamily.Default
     val typography = MaterialTheme.typography
-    val titleStyle = remember(isShort, post.title.length, reading, typography) {
+    // Live text size while pinching; snapped to 5% steps so the text re-wraps a few times per pinch, not every frame.
+    val zoom = remember(reading.textScale) { mutableFloatStateOf(reading.textScale) }
+    val zoomStep by remember(zoom) { derivedStateOf { (zoom.floatValue * 20).roundToInt() / 20f } }
+    var pinching by remember { mutableStateOf(false) }
+    val titleStyle = remember(isShort, post.title.length, reading, typography, zoomStep) {
         // Short titles get bigger type; a long title stays at titleLarge so the story still fits.
         val base = when {
             isShort -> typography.headlineMedium
@@ -189,20 +198,16 @@ fun SwipeCard(
             else -> typography.titleLarge
         }
         base.copy(
-            fontSize = base.fontSize * reading.textScale,
+            fontSize = base.fontSize * zoomStep,
             lineHeight = 1.28.em,
             fontFamily = fontFamily,
             fontWeight = FontWeight.SemiBold,
         )
     }
-    // Live zoom while pinching; snapped to 5% steps so the text re-wraps a few times per pinch, not every frame.
-    val zoom = remember(reading.bodyZoom) { mutableFloatStateOf(reading.bodyZoom) }
-    val zoomStep by remember(zoom) { derivedStateOf { (zoom.floatValue * 20).roundToInt() / 20f } }
-    var pinching by remember { mutableStateOf(false) }
     val bodyStyle = remember(isShort, reading, typography, zoomStep) {
         val base = if (isShort) typography.titleLarge else typography.bodyLarge
         base.copy(
-            fontSize = base.fontSize * reading.textScale * zoomStep,
+            fontSize = base.fontSize * zoomStep,
             lineHeight = 1.55.em,
             fontFamily = fontFamily,
             hyphens = Hyphens.Auto,
@@ -248,7 +253,7 @@ fun SwipeCard(
                     .padding(vertical = 12.dp)
                     .fadeBottomEdge(scroll, container)
                     .then(
-                        if (onBodyZoom == null || post.body.isBlank()) Modifier
+                        if (onTextScale == null) Modifier
                         else Modifier.pinchToZoom(
                             zoom = zoom,
                             onStart = {
@@ -257,7 +262,7 @@ fun SwipeCard(
                             },
                             onEnd = {
                                 pinching = false
-                                onBodyZoom(it)
+                                onTextScale(it)
                             },
                         ),
                     ),
@@ -289,13 +294,20 @@ fun SwipeCard(
                     modifier = Modifier.weight(1f),
                 )
                 if (onOpen != null) {
+                    val haptics = LocalHapticFeedback.current
                     Text(
-                        "Full article ↗",
+                        "Hold for full article ↗",
                         style = typography.labelLarge,
                         color = colors.primary,
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .clickable(onClick = onOpen)
+                            .pointerInput(onOpen) {
+                                detectTapGestures(onLongPress = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onOpen()
+                                })
+                            }
+                            .semantics { onLongClick("Open full article") { onOpen(); true } }
                             .padding(horizontal = 8.dp, vertical = 6.dp),
                     )
                 }
@@ -389,7 +401,7 @@ private fun Modifier.pinchToZoom(
                     zooming = true
                     onStart()
                 }
-                zoom.floatValue = (zoom.floatValue * event.calculateZoom()).coerceIn(MIN_BODY_ZOOM, MAX_BODY_ZOOM)
+                zoom.floatValue = (zoom.floatValue * event.calculateZoom()).coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE)
                 event.changes.forEach { if (it.positionChanged()) it.consume() }
             }
         } while (event.changes.any { it.pressed })

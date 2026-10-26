@@ -1,6 +1,7 @@
-# Reddit Swipe
+# Calm Read
 
-An Android app for swiping through Reddit posts Tinder-style — **text only, no images or video**.
+An Android app for swiping through news and Reddit stories Tinder-style — **text only, no images or video**.
+(It started as "Reddit Swipe"; the repo, package name and APK files keep that name so updates keep installing.)
 
 ## Why
 A calmer replacement for Instagram and other image-heavy social apps: something to do with your thumb that doesn't pull you into an endless visual feed.
@@ -8,15 +9,16 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 ## Core idea
 - One card on screen at a time showing a Reddit text post (title + body, subreddit, score).
 - Swipe right: save / like.
-- Swipe left: skip.
+- Swipe left: skip. Until the first swipe, a hint under the card says which way does what.
 - Only story-length text posts (300+ characters) from story subreddits like TrueOffMyChest, tifu and AITAH; no question subs where the content is in the comments.
 - Quick-read subreddits (Showerthoughts, LifeProTips, YouShouldKnow, Jokes, DadJokes) keep short posts too, shown in larger centered type; add them from the chips on the Subreddits screen (`QUICK_READ_SUBREDDITS` in `data/RedditRepository.kt`).
 - News articles too, from about 35 sites grouped into Center, Liberal, Conservative, World, Business, Tech,
   Science & health and Sports. The News sources screen switches a whole category or single sites on and off
   (`NEWS_FEEDS` in `data/NewsRepository.kt`). Sites marked "full" send whole articles; the rest send a headline and
-  summary with a "Full article ↗" link. Feeds are read straight from the publishers.
-- A Quick / Mixed / Long / News switch above the cards picks which kind of card to deal; it's remembered.
-- Pinch the story text with two fingers to zoom it (the title stays put); Settings shows the zoom and can reset it.
+  summary with a "Hold for full article ↗" link (a long press, so a stray tap never leaves the app). Feeds are read straight from the publishers.
+- A News / Stories switch above the cards picks what to deal; under Stories, chips pick All, Quick or Long. Both are remembered.
+- Text size is one setting: pinch a card with two fingers or use A−/A+ in Settings.
+- Removing a saved post shows an Undo.
 - ↶ in the top bar undoes the last swipe (up to 30).
 - ☰ menu, top right: Swipe, Saved, News sources, Subreddits, Stats (stories and minutes read per day), Settings
   (text size, serif font, NSFW stories, download stories for offline reading).
@@ -38,7 +40,7 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 ## Auto-update
 On launch the app checks the latest release of `scancool/reddit-swipe`. If its version is newer, it offers
 **Update**, downloads the APK, and opens Android's installer. The first time, Android asks you to let
-Reddit Swipe install apps; after that each update is one confirm tap. (Fully silent updates aren't possible
+Calm Read install apps; after that each update is one confirm tap. (Fully silent updates aren't possible
 for apps outside the Play Store.)
 
 Install v0.1 from the GitHub Release (not the debug artifact): updates only install over an app signed with

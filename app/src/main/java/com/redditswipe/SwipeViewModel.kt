@@ -31,17 +31,20 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
-/** Which cards the swipe screen deals: short posts, long stories, news, or everything mixed together. */
+/**
+ * Which cards the swipe screen deals: news, or Reddit stories of one length (Quick or Long) or any
+ * length (Mixed, shown as "All").
+ */
 enum class ReadMode(val label: String) {
     Quick("Quick"),
-    Mixed("Mixed"),
+    Mixed("All"),
     Long("Long"),
     News("News"),
     ;
 
     fun allows(post: RedditPost) = when (this) {
         Quick -> post.isQuickRead
-        Mixed -> true
+        Mixed -> !post.isNews
         Long -> !post.isNews && !post.isQuickRead
         News -> post.isNews
     }
@@ -53,10 +56,15 @@ enum class ReadMode(val label: String) {
         News -> false
     }
 
-    val includesNews: Boolean get() = this == Mixed || this == News
+    val includesNews: Boolean get() = this == News
+
+    companion object {
+        /** The story lengths offered under Stories. */
+        val STORY_MODES = listOf(Mixed, Quick, Long)
+    }
 }
 
-data class ReadingSettings(val textScale: Float = 1f, val serif: Boolean = false, val bodyZoom: Float = 1f)
+data class ReadingSettings(val textScale: Float = 1f, val serif: Boolean = false)
 
 data class SwipeUiState(
     val deck: List<RedditPost> = emptyList(),
@@ -77,9 +85,12 @@ data class SwipeUiState(
     val isCheckingSubreddit: Boolean = false,
     val subredditError: String? = null,
     val readMode: ReadMode = ReadMode.Mixed,
+    // The story length the Stories tab goes back to; never News.
+    val storyMode: ReadMode = ReadMode.Mixed,
+    val showSwipeHint: Boolean = false,
 ) {
     /** The cards the swipe screen shows: the deck narrowed to the current [readMode]. */
-    val visibleDeck: List<RedditPost> get() = if (readMode == ReadMode.Mixed) deck else deck.filter(readMode::allows)
+    val visibleDeck: List<RedditPost> get() = deck.filter(readMode::allows)
 
     /** The subreddits that can supply cards in the current [readMode]. */
     val modeSubreddits: List<String> get() = subreddits.filter(readMode::allowsSubreddit)
@@ -100,8 +111,10 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
             subreddits = store.subreddits ?: DEFAULT_SUBREDDITS,
             newsFeeds = store.newsFeeds ?: DEFAULT_NEWS_FEEDS,
             showNsfw = store.showNsfw,
-            reading = ReadingSettings(store.textScale, store.serif, store.bodyZoom),
+            reading = ReadingSettings(store.textScale, store.serif),
             readMode = ReadMode.entries.firstOrNull { it.name == store.readMode } ?: ReadMode.Mixed,
+            storyMode = ReadMode.STORY_MODES.firstOrNull { it.name == (store.storyMode ?: store.readMode) } ?: ReadMode.Mixed,
+            showSwipeHint = !store.swipeHintDone,
         ),
     )
     val state: StateFlow<SwipeUiState> = _state.asStateFlow()
@@ -150,8 +163,10 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         seen.add(post.id)
         history.addLast(post to save)
         if (history.size > MAX_UNDO) history.removeFirst()
+        if (_state.value.showSwipeHint) store.swipeHintDone = true
         _state.update {
             it.copy(
+                showSwipeHint = false,
                 deck = it.deck - post,
                 saved = if (save) it.saved + post else it.saved,
                 canUndo = true,
@@ -178,6 +193,14 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(saved = it.saved - post) }
     }
 
+    /** Puts a just-removed saved post back where it was (the Undo on the Saved screen). */
+    fun restoreSaved(post: RedditPost, index: Int) {
+        _state.update {
+            if (post in it.saved) it
+            else it.copy(saved = it.saved.toMutableList().apply { add(index.coerceIn(0, size), post) })
+        }
+    }
+
     fun setShowNsfw(show: Boolean) {
         store.showNsfw = show
         _state.update { state ->
@@ -189,18 +212,21 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setReadMode(mode: ReadMode) {
         store.readMode = mode.name
-        _state.update { it.copy(readMode = mode, error = null, isExhausted = false) }
+        if (mode != ReadMode.News) store.storyMode = mode.name
+        _state.update {
+            it.copy(
+                readMode = mode,
+                storyMode = if (mode == ReadMode.News) it.storyMode else mode,
+                error = null,
+                isExhausted = false,
+            )
+        }
         refillIfLow()
     }
 
     fun setTextScale(scale: Float) {
         store.textScale = scale
         _state.update { it.copy(reading = it.reading.copy(textScale = scale)) }
-    }
-
-    fun setBodyZoom(zoom: Float) {
-        store.bodyZoom = zoom
-        _state.update { it.copy(reading = it.reading.copy(bodyZoom = zoom)) }
     }
 
     fun setSerif(serif: Boolean) {
@@ -310,6 +336,7 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.isDownloading) return
         _state.update { it.copy(isDownloading = true) }
         viewModelScope.launch {
+            fetchRound(ReadMode.News)
             repeat(OFFLINE_ROUNDS) { fetchRound(ReadMode.Mixed) }
             _state.update { it.copy(isDownloading = false) }
             persistAll(_state.value)

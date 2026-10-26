@@ -32,19 +32,26 @@ class LocalStore(context: Context) {
         get() = prefs.getString("news_feeds", null)?.split(",")?.filter { it.isNotBlank() }
         set(value) = prefs.edit().putString("news_feeds", value?.joinToString(",")).apply()
 
+    /** Card text size, set in Settings or by pinching a card. */
     var textScale: Float
-        get() = prefs.getFloat("text_scale", 1f)
-        set(value) = prefs.edit().putFloat("text_scale", value).apply()
-
-    /** Extra size for story text (not titles), set by pinching on a card. */
-    var bodyZoom: Float
-        get() = prefs.getFloat("body_zoom", 1f)
-        set(value) = prefs.edit().putFloat("body_zoom", value).apply()
+        // Before 0.12, pinching kept its own extra zoom (body_zoom); it's folded in here and dropped on the next save.
+        get() = prefs.getFloat("text_scale", 1f) * prefs.getFloat("body_zoom", 1f)
+        set(value) = prefs.edit().putFloat("text_scale", value).remove("body_zoom").apply()
 
     /** Name of the [com.redditswipe.ReadMode] picked on the swipe screen. */
     var readMode: String?
         get() = prefs.getString("read_mode", null)
         set(value) = prefs.edit().putString("read_mode", value).apply()
+
+    /** Which story length (Quick, Mixed or Long) the Stories tab returns to after reading news. */
+    var storyMode: String?
+        get() = prefs.getString("story_mode", null)
+        set(value) = prefs.edit().putString("story_mode", value).apply()
+
+    /** True once the user has swiped a card, after which the "← Skip · Save →" hint stays hidden. */
+    var swipeHintDone: Boolean
+        get() = prefs.getBoolean("swipe_hint_done", false)
+        set(value) = prefs.edit().putBoolean("swipe_hint_done", value).apply()
 
     var serif: Boolean
         get() = prefs.getBoolean("serif", false)

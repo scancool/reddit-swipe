@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,7 +29,8 @@ import com.redditswipe.BuildConfig
 import com.redditswipe.ReadingSettings
 import kotlin.math.roundToInt
 
-private val TEXT_SCALES = listOf(0.85f, 1f, 1.15f, 1.3f, 1.5f)
+// Steps for the A−/A+ buttons; pinching a card can land anywhere between MIN_TEXT_SCALE and MAX_TEXT_SCALE.
+private val TEXT_SCALES = listOf(MIN_TEXT_SCALE, 0.85f, 1f, 1.15f, 1.3f, 1.5f, 1.75f, 2f, MAX_TEXT_SCALE)
 
 @Composable
 fun SettingsScreen(
@@ -38,34 +40,32 @@ fun SettingsScreen(
     isDownloading: Boolean,
     onTextScale: (Float) -> Unit,
     onSerif: (Boolean) -> Unit,
-    onBodyZoom: (Float) -> Unit,
     onShowNsfw: (Boolean) -> Unit,
     onDownload: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         SectionTitle("Reading")
-        val index = TEXT_SCALES.indexOfFirst { it >= reading.textScale - 0.01f }.coerceAtLeast(0)
+        val smaller = TEXT_SCALES.lastOrNull { it < reading.textScale - 0.01f }
+        val larger = TEXT_SCALES.firstOrNull { it > reading.textScale + 0.01f }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Text size", Modifier.weight(1f))
-            OutlinedButton(onClick = { onTextScale(TEXT_SCALES[index - 1]) }, enabled = index > 0) { Text("A−") }
+            OutlinedButton(onClick = { smaller?.let(onTextScale) }, enabled = smaller != null) { Text("A−") }
             Text(
                 "${(reading.textScale * 100).roundToInt()}%",
                 Modifier.width(56.dp),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
-            OutlinedButton(onClick = { onTextScale(TEXT_SCALES[index + 1]) }, enabled = index < TEXT_SCALES.lastIndex) { Text("A+") }
+            OutlinedButton(onClick = { larger?.let(onTextScale) }, enabled = larger != null) { Text("A+") }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Story text zoom: ${(reading.bodyZoom * 100).roundToInt()}%")
-                Text(
-                    "Pinch the story text on a card with two fingers to zoom it.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            OutlinedButton(onClick = { onBodyZoom(1f) }, enabled = reading.bodyZoom != 1f) { Text("Reset") }
+            Text(
+                "You can also pinch the text on a card with two fingers.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = { onTextScale(1f) }, enabled = reading.textScale != 1f) { Text("Reset") }
         }
         SettingSwitch("Serif font", reading.serif, onSerif)
         Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {

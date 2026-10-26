@@ -10,13 +10,18 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -79,7 +84,7 @@ fun SwipeScreen(
     onRetry: () -> Unit,
     onOpenSubreddits: () -> Unit,
     onOpenNews: () -> Unit,
-    onBodyZoom: (Float) -> Unit,
+    onTextScale: (Float) -> Unit,
     onReadMode: (ReadMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -143,7 +148,12 @@ fun SwipeScreen(
     }
 
     Column(modifier.fillMaxSize().padding(16.dp)) {
-        ReadModeSwitch(state.readMode, onReadMode, Modifier.align(Alignment.CenterHorizontally).padding(bottom = 12.dp))
+        ReadModeSwitch(
+            mode = state.readMode,
+            storyMode = state.storyMode,
+            onChange = onReadMode,
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 12.dp),
+        )
         Box(
             Modifier.weight(1f).fillMaxWidth().onSizeChanged { slotSize = it },
             contentAlignment = Alignment.Center,
@@ -182,7 +192,7 @@ fun SwipeScreen(
                                 )
                             },
                         transform = if (isTop) topTransform else backTransform,
-                        onBodyZoom = if (isTop) onBodyZoom else null,
+                        onTextScale = if (isTop) onTextScale else null,
                         onOpen = if (isTop && post.isNews) ({ uriHandler.openUri(post.url) }) else null,
                     )
                 }
@@ -196,25 +206,56 @@ fun SwipeScreen(
                 }
             }
         }
-
+        // Until the first swipe, says what each direction does; the SAVE/SKIP stamps only show mid-drag.
+        if (state.showSwipeHint && top != null) {
+            Row(
+                Modifier.widthIn(max = MaxCardWidth).fillMaxWidth().align(Alignment.CenterHorizontally).padding(top = 12.dp),
+            ) {
+                Text("← Swipe left to skip", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.weight(1f))
+                Text("Swipe right to save →", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            }
+        }
     }
 }
 
-/** Quick | Mixed | Long | News, centered above the deck and no wider than a card. */
+/**
+ * News | Stories, centered above the deck and no wider than a card. Under Stories, chips pick the
+ * length (All, Quick, Long); Stories reopens on whichever length was picked last.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReadModeSwitch(mode: ReadMode, onChange: (ReadMode) -> Unit, modifier: Modifier = Modifier) {
-    SingleChoiceSegmentedButtonRow(modifier.widthIn(max = MaxCardWidth).fillMaxWidth()) {
-        ReadMode.entries.forEachIndexed { index, entry ->
-            SegmentedButton(
-                selected = entry == mode,
-                onClick = { onChange(entry) },
-                shape = SegmentedButtonDefaults.itemShape(index, ReadMode.entries.size),
-                // No checkmark: it would squeeze the labels on narrow phones, and the fill already shows the choice.
-                icon = {},
-                label = { Text(entry.label, maxLines = 1) },
-                modifier = Modifier.weight(1f),
-            )
+private fun ReadModeSwitch(
+    mode: ReadMode,
+    storyMode: ReadMode,
+    onChange: (ReadMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isNews = mode == ReadMode.News
+    Column(modifier.widthIn(max = MaxCardWidth).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            listOf(true to "News", false to "Stories").forEachIndexed { index, (news, label) ->
+                SegmentedButton(
+                    selected = news == isNews,
+                    onClick = { onChange(if (news) ReadMode.News else storyMode) },
+                    shape = SegmentedButtonDefaults.itemShape(index, 2),
+                    // No checkmark: the fill already shows the choice.
+                    icon = {},
+                    label = { Text(label, maxLines = 1) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        if (!isNews) {
+            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ReadMode.STORY_MODES.forEach { length ->
+                    FilterChip(
+                        selected = length == mode,
+                        onClick = { onChange(length) },
+                        label = { Text(length.label) },
+                    )
+                }
+            }
         }
     }
 }

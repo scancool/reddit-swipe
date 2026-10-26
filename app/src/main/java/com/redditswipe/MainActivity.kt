@@ -24,18 +24,24 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -74,6 +80,7 @@ class MainActivity : ComponentActivity() {
                 var screen by rememberSaveable { mutableStateOf(Screen.Swipe) }
                 val drawerState = rememberDrawerState(DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
+                val snackbar = remember { SnackbarHostState() }
 
                 val updates: UpdateViewModel = viewModel()
                 val updateState by updates.state.collectAsStateWithLifecycle()
@@ -100,7 +107,7 @@ class MainActivity : ComponentActivity() {
                             CompositionLocalProvider(LocalLayoutDirection provides ltr) {
                                 ModalDrawerSheet {
                                     Text(
-                                        "Reddit Swipe",
+                                        stringResource(R.string.app_name),
                                         style = MaterialTheme.typography.titleLarge,
                                         modifier = Modifier.padding(start = 28.dp, top = 24.dp, bottom = 16.dp),
                                     )
@@ -122,6 +129,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         CompositionLocalProvider(LocalLayoutDirection provides ltr) {
                             Scaffold(
+                                snackbarHost = { SnackbarHost(snackbar) },
                                 topBar = {
                                     TopAppBar(
                                         title = { Text(screen.title) },
@@ -147,13 +155,25 @@ class MainActivity : ComponentActivity() {
                                         onRetry = vm::loadMore,
                                         onOpenSubreddits = { screen = Screen.Subreddits },
                                         onOpenNews = { screen = Screen.News },
-                                        onBodyZoom = vm::setBodyZoom,
+                                        onTextScale = vm::setTextScale,
                                         onReadMode = vm::setReadMode,
                                         modifier = content,
                                     )
                                     Screen.Saved -> SavedScreen(
                                         saved = state.saved,
-                                        onRemove = vm::removeSaved,
+                                        onRemove = { post ->
+                                            val index = state.saved.indexOf(post)
+                                            vm.removeSaved(post)
+                                            snackbar.currentSnackbarData?.dismiss()
+                                            scope.launch {
+                                                val result = snackbar.showSnackbar(
+                                                    "Removed from saved",
+                                                    actionLabel = "Undo",
+                                                    duration = SnackbarDuration.Short,
+                                                )
+                                                if (result == SnackbarResult.ActionPerformed) vm.restoreSaved(post, index)
+                                            }
+                                        },
                                         modifier = content,
                                     )
                                     Screen.News -> NewsSourcesScreen(
@@ -178,7 +198,6 @@ class MainActivity : ComponentActivity() {
                                         isDownloading = state.isDownloading,
                                         onTextScale = vm::setTextScale,
                                         onSerif = vm::setSerif,
-                                        onBodyZoom = vm::setBodyZoom,
                                         onShowNsfw = vm::setShowNsfw,
                                         onDownload = vm::downloadForOffline,
                                         modifier = content,

@@ -54,16 +54,15 @@ fun FeedEndCard(
             icon = Icons.Filled.Forum,
             title = when {
                 state.readMode == ReadMode.News -> "No news sources"
-                state.subreddits.isEmpty() && state.newsFeeds.isEmpty() -> "Pick some sources"
+                state.subreddits.isEmpty() -> "Pick some subreddits"
                 state.readMode == ReadMode.Quick -> "No quick-read subreddits"
                 else -> "No story subreddits"
             },
             detail = when {
                 state.readMode == ReadMode.News -> "Switch on a category like Center or Tech, or a site like BBC News."
-                state.subreddits.isEmpty() && state.newsFeeds.isEmpty() ->
-                    "Stories come from the subreddits and news sites you choose."
+                state.subreddits.isEmpty() -> "Stories come from the subreddits you choose."
                 state.readMode == ReadMode.Quick -> "Add one like r/Showerthoughts from the Quick reads list."
-                else -> "Add a story subreddit like r/tifu, or switch to Mixed."
+                else -> "Add a story subreddit like r/tifu, or pick All."
             },
             action = if (state.readMode == ReadMode.News) "Choose news sources" else "Choose subreddits",
             onAction = if (state.readMode == ReadMode.News) onOpenNews else onOpenSubreddits,
