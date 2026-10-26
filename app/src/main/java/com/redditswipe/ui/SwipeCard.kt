@@ -93,7 +93,7 @@ private const val MIN_BODY_ZOOM = 0.7f
 private const val MAX_BODY_ZOOM = 2.5f
 
 /**
- * Position of the top card, shared by the drag gesture and the top bar's heart. Offsets are plain snapshot
+ * Position of the top card, moved by the drag gesture. Offsets are plain snapshot
  * state written straight from pointer events and read only inside graphicsLayer, so dragging redraws
  * the card without recomposing it.
  */

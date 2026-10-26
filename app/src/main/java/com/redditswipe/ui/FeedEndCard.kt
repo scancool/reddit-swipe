@@ -46,6 +46,7 @@ fun FeedEndCard(
     state: SwipeUiState,
     onRetry: () -> Unit,
     onOpenSubreddits: () -> Unit,
+    onOpenNews: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when {
@@ -58,14 +59,14 @@ fun FeedEndCard(
                 else -> "No story subreddits"
             },
             detail = when {
-                state.readMode == ReadMode.News -> "Switch on a news site like BBC News or The Conversation."
+                state.readMode == ReadMode.News -> "Switch on a category like Center or Tech, or a site like BBC News."
                 state.subreddits.isEmpty() && state.newsFeeds.isEmpty() ->
                     "Stories come from the subreddits and news sites you choose."
                 state.readMode == ReadMode.Quick -> "Add one like r/Showerthoughts from the Quick reads list."
                 else -> "Add a story subreddit like r/tifu, or switch to Mixed."
             },
-            action = "Choose sources",
-            onAction = onOpenSubreddits,
+            action = if (state.readMode == ReadMode.News) "Choose news sources" else "Choose subreddits",
+            onAction = if (state.readMode == ReadMode.News) onOpenNews else onOpenSubreddits,
             modifier = modifier,
         )
         !state.isRestored || state.isLoading -> PlaceholderCard(modifier)

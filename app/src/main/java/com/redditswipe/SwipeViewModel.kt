@@ -250,10 +250,11 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         loadMore()
     }
 
-    fun setNewsFeed(name: String, on: Boolean) {
+    /** Switches news feeds on or off: one chip on the News screen, or a whole category at once. */
+    fun setNewsFeeds(names: Collection<String>, on: Boolean) {
         _state.update { state ->
             // Kept in NEWS_FEEDS order so the list reads the same however it was toggled.
-            val feeds = NEWS_FEEDS.map { it.name }.filter { if (it == name) on else it in state.newsFeeds }
+            val feeds = NEWS_FEEDS.map { it.name }.filter { if (it in names) on else it in state.newsFeeds }
             val updated = state.copy(newsFeeds = feeds)
             updated.copy(deck = updated.deck.filter { updated.allows(it) })
         }

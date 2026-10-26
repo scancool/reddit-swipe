@@ -11,13 +11,14 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 - Swipe left: skip.
 - Only story-length text posts (300+ characters) from story subreddits like TrueOffMyChest, tifu and AITAH; no question subs where the content is in the comments.
 - Quick-read subreddits (Showerthoughts, LifeProTips, YouShouldKnow, Jokes, DadJokes) keep short posts too, shown in larger centered type; add them from the chips on the Subreddits screen (`QUICK_READ_SUBREDDITS` in `data/RedditRepository.kt`).
-- News articles too: The Conversation and ProPublica (whole articles), plus BBC News, The Guardian, NPR, Ars Technica,
-  Al Jazeera and the New York Times (headline and summary, with a "Full article ↗" link). Switch them on or off under
-  News on the Sources screen (`NEWS_FEEDS` in `data/NewsRepository.kt`). Feeds are read straight from the publishers.
+- News articles too, from about 35 sites grouped into Center, Liberal, Conservative, World, Business, Tech,
+  Science & health and Sports. The News sources screen switches a whole category or single sites on and off
+  (`NEWS_FEEDS` in `data/NewsRepository.kt`). Sites marked "full" send whole articles; the rest send a headline and
+  summary with a "Full article ↗" link. Feeds are read straight from the publishers.
 - A Quick / Mixed / Long / News switch above the cards picks which kind of card to deal; it's remembered.
 - Pinch the story text with two fingers to zoom it (the title stays put); Settings shows the zoom and can reset it.
-- ↶ in the top bar undoes the last swipe (up to 30); ♡ next to it saves the current story, like swiping right.
-- ☰ menu: Swipe, Saved, Sources (news sites and subreddits), Stats (stories and minutes read per day), Settings
+- ↶ in the top bar undoes the last swipe (up to 30).
+- ☰ menu, top right: Swipe, Saved, News sources, Subreddits, Stats (stories and minutes read per day), Settings
   (text size, serif font, NSFW stories, download stories for offline reading).
 - Saved posts, swiped history (so stories don't repeat), the unread deck (offline cache) and stats are kept on the phone.
 

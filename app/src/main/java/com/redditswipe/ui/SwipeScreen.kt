@@ -22,7 +22,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -30,8 +29,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,20 +61,6 @@ private val FlingVelocity = 900.dp
 
 private enum class Exit { Left, Right }
 
-/**
- * Lets controls outside the swipe screen (the heart in the top bar) act on the top card, so it
- * leaves with the same animation as a swipe.
- */
-@Stable
-class DeckController {
-    internal var saveTopCard: (() -> Unit)? = null
-
-    /** Saves the story on top of the deck, as if it were swiped right. */
-    fun saveTop() {
-        saveTopCard?.invoke()
-    }
-}
-
 /** A swiped card playing its exit animation; the deck has already moved on underneath it. */
 private class LeavingCard(
     val id: Long,
@@ -95,9 +78,9 @@ fun SwipeScreen(
     onSwipeRight: (RedditPost) -> Unit,
     onRetry: () -> Unit,
     onOpenSubreddits: () -> Unit,
+    onOpenNews: () -> Unit,
     onBodyZoom: (Float) -> Unit,
     onReadMode: (ReadMode) -> Unit,
-    controller: DeckController,
     modifier: Modifier = Modifier,
 ) {
     val view = LocalView.current
@@ -117,7 +100,7 @@ fun SwipeScreen(
     // How big the card underneath was when the top one left, so it grows on from there instead of popping.
     var handoffScale by remember { mutableFloatStateOf(BACK_SCALE) }
 
-    // One swipe state per top card, shared by the drag gesture and the top bar's heart.
+    // One swipe state per top card, rebuilt when a new card reaches the top.
     val swipeState = remember(top?.id, cardWidthPx) {
         // The width is 0 until the first layout; 1px keeps the progress math finite until then.
         CardSwipeState(cardWidthPx.coerceAtLeast(1f), flingPx, handoffScale)
@@ -158,8 +141,6 @@ fun SwipeScreen(
             Exit.Right -> onSwipeRight(post)
         }
     }
-    SideEffect { controller.saveTopCard = { top?.let { commit(it, Exit.Right, 0f) } } }
-    DisposableEffect(controller) { onDispose { controller.saveTopCard = null } }
 
     Column(modifier.fillMaxSize().padding(16.dp)) {
         ReadModeSwitch(state.readMode, onReadMode, Modifier.align(Alignment.CenterHorizontally).padding(bottom = 12.dp))
@@ -172,7 +153,7 @@ fun SwipeScreen(
             // Under the last card sits a loading placeholder or the end-of-feed card, so the final swipe
             // reveals what comes next rather than a blank screen.
             if (next == null) {
-                FeedEndCard(state, onRetry, onOpenSubreddits, cardModifier)
+                FeedEndCard(state, onRetry, onOpenSubreddits, onOpenNews, cardModifier)
             }
 
             // Back card and top card from one keyed loop: when the back card moves up it keeps its
@@ -294,7 +275,7 @@ private fun LeavingCardView(
     LaunchedEffect(card) {
         val targetX = widthPx * 1.5f * decision
         val distance = abs(targetX - card.startX)
-        // A flung card keeps the finger's speed; a tap on the heart accelerates away from rest.
+        // A flung card keeps the finger's speed; an accessibility Save/Skip accelerates away from rest.
         val flung = abs(card.velocity) > 1f
         val duration = if (flung) (distance / abs(card.velocity) * 1000f).toInt().coerceIn(120, 300) else 260
         val spec = tween<Float>(duration, easing = if (flung) LinearEasing else FastOutLinearInEasing)

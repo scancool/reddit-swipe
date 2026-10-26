@@ -14,17 +14,65 @@ import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
 
 /** A news site's RSS or Atom feed. [fullText] feeds carry whole articles; the rest a headline and summary. */
-data class NewsFeed(val name: String, val url: String, val fullText: Boolean)
+data class NewsFeed(val name: String, val url: String, val category: NewsCategory, val fullText: Boolean = false)
+
+/**
+ * How the News screen groups feeds. The political leanings follow common media-bias ratings (such as
+ * AllSides) and are only a rough guide.
+ */
+enum class NewsCategory(val label: String) {
+    Center("Center"),
+    Liberal("Liberal"),
+    Conservative("Conservative"),
+    World("World"),
+    Business("Business"),
+    Tech("Tech"),
+    Science("Science & health"),
+    Sports("Sports"),
+}
 
 val NEWS_FEEDS = listOf(
-    NewsFeed("The Conversation", "https://theconversation.com/us/articles.atom", fullText = true),
-    NewsFeed("ProPublica", "https://feeds.propublica.org/propublica/main", fullText = true),
-    NewsFeed("BBC News", "https://feeds.bbci.co.uk/news/rss.xml", fullText = false),
-    NewsFeed("The Guardian", "https://www.theguardian.com/world/rss", fullText = false),
-    NewsFeed("NPR", "https://feeds.npr.org/1001/rss.xml", fullText = false),
-    NewsFeed("Ars Technica", "https://feeds.arstechnica.com/arstechnica/index", fullText = false),
-    NewsFeed("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml", fullText = false),
-    NewsFeed("New York Times", "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", fullText = false),
+    NewsFeed("BBC News", "https://feeds.bbci.co.uk/news/rss.xml", NewsCategory.Center),
+    NewsFeed("The Hill", "https://thehill.com/feed/", NewsCategory.Center),
+    NewsFeed("Axios", "https://api.axios.com/feed/", NewsCategory.Center, fullText = true),
+    NewsFeed("Christian Science Monitor", "https://rss.csmonitor.com/feeds/all", NewsCategory.Center),
+
+    NewsFeed("The Guardian", "https://www.theguardian.com/world/rss", NewsCategory.Liberal),
+    NewsFeed("New York Times", "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", NewsCategory.Liberal),
+    NewsFeed("NPR", "https://feeds.npr.org/1001/rss.xml", NewsCategory.Liberal),
+    NewsFeed("ProPublica", "https://feeds.propublica.org/propublica/main", NewsCategory.Liberal, fullText = true),
+    NewsFeed("Vox", "https://www.vox.com/rss/index.xml", NewsCategory.Liberal, fullText = true),
+    NewsFeed("The Atlantic", "https://www.theatlantic.com/feed/all/", NewsCategory.Liberal, fullText = true),
+    NewsFeed("Mother Jones", "https://www.motherjones.com/feed/", NewsCategory.Liberal, fullText = true),
+
+    NewsFeed("Fox News", "https://moxie.foxnews.com/google-publisher/latest.xml", NewsCategory.Conservative, fullText = true),
+    NewsFeed("National Review", "https://www.nationalreview.com/feed/", NewsCategory.Conservative),
+    NewsFeed("New York Post", "https://nypost.com/feed/", NewsCategory.Conservative),
+    NewsFeed("Washington Times", "https://www.washingtontimes.com/rss/headlines/news/", NewsCategory.Conservative),
+    NewsFeed("The Federalist", "https://thefederalist.com/feed/", NewsCategory.Conservative),
+
+    NewsFeed("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml", NewsCategory.World),
+    NewsFeed("BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml", NewsCategory.World),
+    NewsFeed("DW", "https://rss.dw.com/rdf/rss-en-all", NewsCategory.World),
+    NewsFeed("France 24", "https://www.france24.com/en/rss", NewsCategory.World),
+
+    NewsFeed("CNBC", "https://www.cnbc.com/id/100003114/device/rss/rss.html", NewsCategory.Business),
+    NewsFeed("MarketWatch", "https://feeds.content.dowjones.io/public/rss/mw_topstories", NewsCategory.Business),
+    NewsFeed("WSJ Markets", "https://feeds.a.dj.com/rss/RSSMarketsMain.xml", NewsCategory.Business),
+    NewsFeed("Fortune", "https://fortune.com/feed/fortune-feeds/?id=3230629", NewsCategory.Business, fullText = true),
+
+    NewsFeed("Ars Technica", "https://feeds.arstechnica.com/arstechnica/index", NewsCategory.Tech),
+    NewsFeed("The Verge", "https://www.theverge.com/rss/index.xml", NewsCategory.Tech),
+    NewsFeed("Wired", "https://www.wired.com/feed/rss", NewsCategory.Tech),
+    NewsFeed("TechCrunch", "https://techcrunch.com/feed/", NewsCategory.Tech),
+
+    NewsFeed("The Conversation", "https://theconversation.com/us/articles.atom", NewsCategory.Science, fullText = true),
+    NewsFeed("ScienceDaily", "https://www.sciencedaily.com/rss/all.xml", NewsCategory.Science),
+    NewsFeed("NASA", "https://www.nasa.gov/feed/", NewsCategory.Science, fullText = true),
+    NewsFeed("STAT", "https://www.statnews.com/feed/", NewsCategory.Science),
+
+    NewsFeed("ESPN", "https://www.espn.com/espn/rss/news", NewsCategory.Sports),
+    NewsFeed("BBC Sport", "https://feeds.bbci.co.uk/sport/rss.xml", NewsCategory.Sports),
 )
 
 /** Feeds switched on until the user picks their own. */
