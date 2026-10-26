@@ -33,6 +33,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,6 +53,7 @@ import com.redditswipe.ui.NewsSourcesScreen
 import com.redditswipe.ui.SavedScreen
 import com.redditswipe.ui.SettingsScreen
 import com.redditswipe.ui.StatsScreen
+import com.redditswipe.ui.SwipeBackContainer
 import com.redditswipe.ui.SubredditsScreen
 import com.redditswipe.ui.SwipeScreen
 import com.redditswipe.ui.theme.RedditSwipeTheme
@@ -91,8 +93,7 @@ class MainActivity : ComponentActivity() {
                 LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.onAppHidden() }
                 UpdateDialog(updateState, onUpdate = updates::update, onDismiss = updates::dismiss)
 
-                // Back returns to Swipe from other screens; the later handler (open menu) wins.
-                BackHandler(enabled = screen != Screen.Swipe) { screen = Screen.Swipe }
+                // Back closes the open menu; on other screens, SwipeBackContainer takes back to Swipe.
                 BackHandler(enabled = drawerState.isOpen) { scope.launch { drawerState.close() } }
 
                 // The drawer only slides in from the start edge, so it's laid out right-to-left to put the menu
@@ -149,8 +150,8 @@ class MainActivity : ComponentActivity() {
                                 },
                             ) { padding ->
                                 val content = Modifier.padding(padding)
-                                when (screen) {
-                                    Screen.Swipe -> SwipeScreen(
+                                if (screen == Screen.Swipe) {
+                                    SwipeScreen(
                                         state = state,
                                         onSwipeLeft = vm::swipeLeft,
                                         onSwipeRight = vm::swipeRight,
@@ -162,54 +163,64 @@ class MainActivity : ComponentActivity() {
                                         onToggleOriginal = vm::toggleOriginal,
                                         modifier = content,
                                     )
-                                    Screen.Saved -> SavedScreen(
-                                        saved = state.saved,
-                                        onRemove = { post ->
-                                            val index = state.saved.indexOf(post)
-                                            vm.removeSaved(post)
-                                            snackbar.currentSnackbarData?.dismiss()
-                                            scope.launch {
-                                                val result = snackbar.showSnackbar(
-                                                    "Removed from saved",
-                                                    actionLabel = "Undo",
-                                                    duration = SnackbarDuration.Short,
+                                } else {
+                                    // A fresh container per screen, so a half-swiped page never carries over to the next one.
+                                    key(screen) {
+                                        SwipeBackContainer(
+                                            // While the menu is open, back closes it instead.
+                                            enabled = !drawerState.isOpen,
+                                            onBack = { screen = Screen.Swipe },
+                                            modifier = content,
+                                        ) {
+                                            when (screen) {
+                                                Screen.Saved -> SavedScreen(
+                                                    saved = state.saved,
+                                                    onRemove = { post ->
+                                                        val index = state.saved.indexOf(post)
+                                                        vm.removeSaved(post)
+                                                        snackbar.currentSnackbarData?.dismiss()
+                                                        scope.launch {
+                                                            val result = snackbar.showSnackbar(
+                                                                "Removed from saved",
+                                                                actionLabel = "Undo",
+                                                                duration = SnackbarDuration.Short,
+                                                            )
+                                                            if (result == SnackbarResult.ActionPerformed) vm.restoreSaved(post, index)
+                                                        }
+                                                    },
                                                 )
-                                                if (result == SnackbarResult.ActionPerformed) vm.restoreSaved(post, index)
+                                                Screen.News -> NewsSourcesScreen(
+                                                    newsFeeds = state.newsFeeds,
+                                                    onSetFeeds = vm::setNewsFeeds,
+                                                )
+                                                Screen.Subreddits -> SubredditsScreen(
+                                                    subreddits = state.subreddits,
+                                                    isChecking = state.isCheckingSubreddit,
+                                                    error = state.subredditError,
+                                                    onAdd = vm::addSubreddit,
+                                                    onRemove = vm::removeSubreddit,
+                                                    onRestoreDefaults = vm::restoreDefaultSubreddits,
+                                                )
+                                                Screen.Stats -> StatsScreen(stats = state.stats)
+                                                Screen.Settings -> SettingsScreen(
+                                                    reading = state.reading,
+                                                    showNsfw = state.showNsfw,
+                                                    storiesReady = state.deck.size,
+                                                    isDownloading = state.isDownloading,
+                                                    onTextScale = vm::setTextScale,
+                                                    onSerif = vm::setSerif,
+                                                    storyMode = state.storyMode,
+                                                    onStoryMode = vm::setStoryMode,
+                                                    translateCards = state.translateCards,
+                                                    translationTarget = vm.translationTarget,
+                                                    onTranslateCards = vm::setTranslateCards,
+                                                    onShowNsfw = vm::setShowNsfw,
+                                                    onDownload = vm::downloadForOffline,
+                                                )
+                                                Screen.Swipe -> {}
                                             }
-                                        },
-                                        modifier = content,
-                                    )
-                                    Screen.News -> NewsSourcesScreen(
-                                        newsFeeds = state.newsFeeds,
-                                        onSetFeeds = vm::setNewsFeeds,
-                                        modifier = content,
-                                    )
-                                    Screen.Subreddits -> SubredditsScreen(
-                                        subreddits = state.subreddits,
-                                        isChecking = state.isCheckingSubreddit,
-                                        error = state.subredditError,
-                                        onAdd = vm::addSubreddit,
-                                        onRemove = vm::removeSubreddit,
-                                        onRestoreDefaults = vm::restoreDefaultSubreddits,
-                                        modifier = content,
-                                    )
-                                    Screen.Stats -> StatsScreen(stats = state.stats, modifier = content)
-                                    Screen.Settings -> SettingsScreen(
-                                        reading = state.reading,
-                                        showNsfw = state.showNsfw,
-                                        storiesReady = state.deck.size,
-                                        isDownloading = state.isDownloading,
-                                        onTextScale = vm::setTextScale,
-                                        onSerif = vm::setSerif,
-                                        storyMode = state.storyMode,
-                                        onStoryMode = vm::setStoryMode,
-                                        translateCards = state.translateCards,
-                                        translationTarget = vm.translationTarget,
-                                        onTranslateCards = vm::setTranslateCards,
-                                        onShowNsfw = vm::setShowNsfw,
-                                        onDownload = vm::downloadForOffline,
-                                        modifier = content,
-                                    )
+                                        }
+                                    }
                                 }
                             }
                         }

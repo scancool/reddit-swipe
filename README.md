@@ -24,6 +24,8 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 - Text size is one setting: pinch a card with two fingers or use A−/A+ in Settings.
 - Removing a saved post shows an Undo.
 - ↶ at the top left undoes the last swipe (up to 30).
+- Menu screens (Saved, News sources, Subreddits, Stats, Settings) swipe away to the right to go back to the cards
+  (`ui/SwipeBack.kt`); Android's back gesture slides them the same way.
 - ☰ menu, top right: Swipe, Saved, News sources, Subreddits, Stats (stories and minutes read per day), Settings
   (text size, serif font, NSFW stories, download stories for offline reading).
 - Saved posts, swiped history (so stories don't repeat), the unread deck (offline cache) and stats are kept on the phone.
