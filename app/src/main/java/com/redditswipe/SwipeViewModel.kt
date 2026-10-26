@@ -14,8 +14,6 @@ import com.redditswipe.data.isQuickReadSubreddit
 import com.redditswipe.data.RedditPost
 import com.redditswipe.data.RedditRepository
 import com.redditswipe.data.newsFeed
-import com.redditswipe.translate.CardTranslation
-import com.redditswipe.translate.CardTranslator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.async
@@ -90,15 +88,7 @@ data class SwipeUiState(
     // The story length the Stories tab goes back to; never News.
     val storyMode: ReadMode = ReadMode.Mixed,
     val showSwipeHint: Boolean = false,
-    // Translate cards that aren't in the phone's language (Settings), and the translations made so far, by post ID.
-    val translateCards: Boolean = true,
-    val translations: Map<String, CardTranslation> = emptyMap(),
-    // Cards the reader switched back to their original language.
-    val showingOriginal: Set<String> = emptySet(),
 ) {
-    /** The translation to show on [post], if translating is on and one has been started. */
-    fun translationFor(post: RedditPost): CardTranslation? = if (translateCards) translations[post.id] else null
-
     /** The cards the swipe screen shows: the deck narrowed to the current [readMode]. */
     val visibleDeck: List<RedditPost> get() = deck.filter(readMode::allows)
 
@@ -125,7 +115,6 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
             readMode = ReadMode.entries.firstOrNull { it.name == store.readMode } ?: ReadMode.Mixed,
             storyMode = ReadMode.STORY_MODES.firstOrNull { it.name == (store.storyMode ?: store.readMode) } ?: ReadMode.Mixed,
             showSwipeHint = !store.swipeHintDone,
-            translateCards = store.translateCards,
         ),
     )
     val state: StateFlow<SwipeUiState> = _state.asStateFlow()
@@ -140,11 +129,6 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
     private val fetchMutex = Mutex()
 
     private var restored = false
-
-    private val translator = CardTranslator()
-
-    // Posts already checked for translation (whatever the outcome), so each is detected only once.
-    private val translationChecked = HashSet<String>()
 
     // Reading time for the current card, counted only while the app is on screen.
     private var visibleSince: Long? = null
@@ -168,48 +152,6 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
             refillIfLow()
             persistChanges()
         }
-        // Translates the top card and the one under it ahead of time, so swiping never waits on it.
-        viewModelScope.launch {
-            _state.map { if (it.translateCards) it.visibleDeck.take(2) else emptyList() }
-                .distinctUntilChanged()
-                .collect { posts -> posts.forEach(::translateIfForeign) }
-        }
-    }
-
-    private fun translateIfForeign(post: RedditPost) {
-        val target = translator.targetLanguage ?: return
-        if (!translationChecked.add(post.id)) return
-        viewModelScope.launch {
-            val source = runCatching { translator.detectLanguage(post) }.getOrNull()
-            if (source == null || source == target) return@launch
-            // A placeholder first, so the card can say it's translating while the model downloads.
-            _state.update { it.copy(translations = it.translations + (post.id to CardTranslation(source))) }
-            val done = runCatching { translator.translate(post, source, target) }.getOrNull()
-            _state.update {
-                it.copy(translations = if (done != null) it.translations + (post.id to done) else it.translations - post.id)
-            }
-            // A failed translation (no internet for the model, say) is tried again when the card comes back up.
-            if (done == null) translationChecked.remove(post.id)
-        }
-    }
-
-    fun toggleOriginal(post: RedditPost) {
-        _state.update {
-            val showing = it.showingOriginal
-            it.copy(showingOriginal = if (post.id in showing) showing - post.id else showing + post.id)
-        }
-    }
-
-    fun setTranslateCards(on: Boolean) {
-        store.translateCards = on
-        _state.update { it.copy(translateCards = on) }
-    }
-
-    /** The phone's language name if cards can be translated into it, else null. */
-    val translationTarget: String? get() = translator.targetLanguage?.let { translator.targetLanguageName }
-
-    override fun onCleared() {
-        translator.close()
     }
 
     fun swipeRight(post: RedditPost) = swipe(post, save = true)

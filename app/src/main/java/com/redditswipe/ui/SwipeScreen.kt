@@ -52,7 +52,6 @@ import com.redditswipe.ReadMode
 import com.redditswipe.ReadingSettings
 import com.redditswipe.SwipeUiState
 import com.redditswipe.data.RedditPost
-import com.redditswipe.translate.CardTranslation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -85,7 +84,6 @@ fun SwipeScreen(
     onOpenNews: () -> Unit,
     onTextScale: (Float) -> Unit,
     onReadMode: (ReadMode) -> Unit,
-    onToggleOriginal: (RedditPost) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val view = LocalView.current
@@ -194,23 +192,13 @@ fun SwipeScreen(
                         transform = if (isTop) topTransform else backTransform,
                         onTextScale = if (isTop) onTextScale else null,
                         onOpen = if (isTop && post.isNews) ({ uriHandler.openUri(post.url) }) else null,
-                        translation = state.translationFor(post),
-                        showOriginal = post.id in state.showingOriginal,
-                        onToggleOriginal = if (isTop) ({ onToggleOriginal(post) }) else null,
                     )
                 }
             }
 
             leaving.forEach { card ->
                 key("leaving-${card.id}") {
-                    LeavingCardView(
-                        card = card,
-                        reading = state.reading,
-                        translation = state.translationFor(card.post),
-                        showOriginal = card.post.id in state.showingOriginal,
-                        modifier = cardModifier,
-                        widthPx = cardWidthPx,
-                    ) {
+                    LeavingCardView(card, state.reading, cardModifier, cardWidthPx) {
                         leaving -= card
                     }
                 }
@@ -303,8 +291,6 @@ private fun Modifier.horizontalSwipe(
 private fun LeavingCardView(
     card: LeavingCard,
     reading: ReadingSettings,
-    translation: CardTranslation?,
-    showOriginal: Boolean,
     modifier: Modifier,
     widthPx: Float,
     onGone: () -> Unit,
@@ -335,8 +321,6 @@ private fun LeavingCardView(
             rotationZ = rotation.value
             shadowElevation = 14.dp.toPx()
         },
-        translation = translation,
-        showOriginal = showOriginal,
     )
 }
 

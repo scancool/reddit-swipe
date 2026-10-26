@@ -48,9 +48,6 @@ fun SettingsScreen(
     onSerif: (Boolean) -> Unit,
     storyMode: ReadMode,
     onStoryMode: (ReadMode) -> Unit,
-    translateCards: Boolean,
-    translationTarget: String?,
-    onTranslateCards: (Boolean) -> Unit,
     onShowNsfw: (Boolean) -> Unit,
     onDownload: () -> Unit,
     modifier: Modifier = Modifier,
@@ -91,23 +88,6 @@ fun SettingsScreen(
                 "So this happened last week, and I still can't believe it. Here's how it started…",
                 style = style,
                 modifier = Modifier.padding(16.dp),
-            )
-        }
-
-        Divider()
-        SectionTitle("Translation")
-        if (translationTarget != null) {
-            SettingSwitch("Translate into $translationTarget", translateCards, onTranslateCards)
-            Text(
-                "Cards in other languages are translated on this phone; nothing is sent anywhere. Each language " +
-                    "downloads once (about 30 MB), then works offline. Tap \"Show original\" on a card to see the original.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Text(
-                "Translation isn't available for your phone's language yet.",
-                style = MaterialTheme.typography.bodyMedium,
             )
         }
 
