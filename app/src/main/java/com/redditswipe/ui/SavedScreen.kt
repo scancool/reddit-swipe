@@ -2,11 +2,13 @@ package com.redditswipe.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,6 +25,7 @@ import com.redditswipe.data.RedditPost
 fun SavedScreen(
     saved: List<RedditPost>,
     onRemove: (RedditPost) -> Unit,
+    onShare: (RedditPost) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (saved.isEmpty()) {
@@ -44,8 +47,13 @@ fun SavedScreen(
                     null
                 },
                 trailingContent = {
-                    IconButton(onClick = { onRemove(post) }) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Remove")
+                    Row {
+                        IconButton(onClick = { onShare(post) }) {
+                            Icon(Icons.Filled.Share, contentDescription = "Share")
+                        }
+                        IconButton(onClick = { onRemove(post) }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Remove")
+                        }
                     }
                 },
             )

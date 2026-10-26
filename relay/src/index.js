@@ -1,6 +1,9 @@
-// Relay between the Reddit Swipe app and Reddit's official API.
+// Relay between the Calm Read (formerly Reddit Swipe) app and Reddit's official API.
 // Holds the Reddit app secret so it never ships inside the public APK.
 // Only subreddit listings can be requested: GET /r/<sub>/<hot|new|top|rising>?limit=&after=&t=
+// It also serves the optional accounts (sign-in codes and sync), in account.js.
+
+import { handleAccount, json } from "./account.js";
 
 const USER_AGENT = "cloudflare-worker:reddit-swipe-relay:v1 (by /u/titsonaplane)";
 const LISTING_PATH = /^\/r\/([A-Za-z0-9_]{2,21})\/(hot|new|top|rising)$/;
@@ -30,18 +33,13 @@ async function getToken(env) {
   return token;
 }
 
-function json(body, status) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
 export default {
   async fetch(request, env, ctx) {
-    if (request.method !== "GET") return json({ error: "method not allowed" }, 405);
-
     const url = new URL(request.url);
+    const account = await handleAccount(request, env, url);
+    if (account) return account;
+
+    if (request.method !== "GET") return json({ error: "method not allowed" }, 405);
     if (url.pathname === "/") return json({ ok: true }, 200);
 
     const match = url.pathname.match(LISTING_PATH);

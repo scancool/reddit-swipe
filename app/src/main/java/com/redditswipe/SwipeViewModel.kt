@@ -4,7 +4,10 @@ import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.redditswipe.data.AccountRepository
+import com.redditswipe.data.AccountSync
 import com.redditswipe.data.DEFAULT_NEWS_FEEDS
+import com.redditswipe.data.SignedOutException
 import com.redditswipe.data.DayStats
 import com.redditswipe.data.LocalStore
 import com.redditswipe.data.NEWS_FEEDS
@@ -29,6 +32,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.time.LocalDate
 
 /**
@@ -66,6 +71,17 @@ enum class ReadMode(val label: String) {
 
 data class ReadingSettings(val textScale: Float = 1f, val serif: Boolean = false)
 
+/** The optional account as the Account screen shows it. */
+data class AccountState(
+    /** Signed in as this address; null when signed out. */
+    val email: String? = null,
+    /** A code was emailed here and the app is waiting for it. */
+    val pendingEmail: String? = null,
+    val isBusy: Boolean = false,
+    val error: String? = null,
+    val lastSyncedAt: Long = 0L,
+)
+
 data class SwipeUiState(
     val deck: List<RedditPost> = emptyList(),
     val saved: List<RedditPost> = emptyList(),
@@ -88,6 +104,7 @@ data class SwipeUiState(
     // The story length the Stories tab goes back to; never News.
     val storyMode: ReadMode = ReadMode.Mixed,
     val showSwipeHint: Boolean = false,
+    val account: AccountState = AccountState(),
 ) {
     /** The cards the swipe screen shows: the deck narrowed to the current [readMode]. */
     val visibleDeck: List<RedditPost> get() = deck.filter(readMode::allows)
@@ -105,6 +122,8 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = RedditRepository()
     private val news = NewsRepository()
     private val store = LocalStore(app)
+    private val account = AccountRepository(app)
+    private val sync = AccountSync(account, ::syncSnapshot, ::syncFingerprint, ::applySyncSnapshot)
 
     private val _state = MutableStateFlow(
         SwipeUiState(
@@ -115,6 +134,7 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
             readMode = ReadMode.entries.firstOrNull { it.name == store.readMode } ?: ReadMode.Mixed,
             storyMode = ReadMode.STORY_MODES.firstOrNull { it.name == (store.storyMode ?: store.readMode) } ?: ReadMode.Mixed,
             showSwipeHint = !store.swipeHintDone,
+            account = AccountState(email = account.email, lastSyncedAt = account.syncedAt),
         ),
     )
     val state: StateFlow<SwipeUiState> = _state.asStateFlow()
@@ -129,6 +149,10 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
     private val fetchMutex = Mutex()
 
     private var restored = false
+
+    // How many swiped-history keys the last upload carried, so going to the background uploads only if it grew.
+    private var seenAtUpload = -1
+    private var lastSyncAttempt = 0L
 
     // Reading time for the current card, counted only while the app is on screen.
     private var visibleSince: Long? = null
@@ -151,6 +175,8 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
             }
             restored = true
             refillIfLow()
+            launch { runSync() }
+            launch { syncWhenChanged() }
             persistChanges()
         }
     }
@@ -291,6 +317,8 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onAppVisible() {
         if (visibleSince == null) visibleSince = SystemClock.elapsedRealtime()
+        // Picks up what another phone changed while this one was away.
+        if (restored && SystemClock.elapsedRealtime() - lastSyncAttempt > RESYNC_MS) viewModelScope.launch { runSync() }
         // The app can sit in the background for days; news that went stale meanwhile leaves the deck.
         if (restored && _state.value.deck.any { it.isStaleNews() }) {
             _state.update { state -> state.copy(deck = state.deck.filter { state.allows(it) }) }
@@ -303,6 +331,152 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         visibleSince = null
         val snapshot = _state.value
         if (restored) viewModelScope.launch { persistAll(snapshot) }
+        if (restored && seen.size != seenAtUpload) viewModelScope.launch { runSync(forceUpload = true) }
+    }
+
+    // --- Optional account: sign in with an emailed code, then sync (see AccountSync) ---
+
+    fun requestSignInCode(input: String) {
+        val email = input.trim().lowercase()
+        accountAction {
+            account.requestCode(email)
+            _state.update { it.copy(account = it.account.copy(pendingEmail = email)) }
+        }
+    }
+
+    fun verifySignInCode(code: String) {
+        val email = _state.value.account.pendingEmail ?: return
+        accountAction {
+            account.verifyCode(email, code.trim())
+            _state.update { it.copy(account = AccountState(email = account.email, isBusy = true)) }
+            // The first sync merges this phone's likes into the account rather than replacing either side.
+            runSync(firstTime = true, quiet = false)
+        }
+    }
+
+    fun cancelSignIn() {
+        _state.update { it.copy(account = AccountState()) }
+    }
+
+    fun signOut() {
+        accountAction {
+            account.signOut()
+            _state.update { it.copy(account = AccountState()) }
+        }
+    }
+
+    fun syncNow() {
+        accountAction { runSync(forceUpload = true, quiet = false) }
+    }
+
+    /** Runs [block] with the Account screen showing it's busy, and shows any failure there. */
+    private fun accountAction(block: suspend () -> Unit) {
+        if (_state.value.account.isBusy) return
+        _state.update { it.copy(account = it.account.copy(isBusy = true, error = null)) }
+        viewModelScope.launch {
+            val error = runCatching { block() }.exceptionOrNull()?.message
+            _state.update { it.copy(account = it.account.copy(isBusy = false, error = error)) }
+        }
+    }
+
+    /**
+     * Syncs if signed in. Background syncs ([quiet]) fail silently, except that an ended session signs the
+     * phone out; ones the user asked for throw, so the Account screen can say what went wrong.
+     */
+    private suspend fun runSync(firstTime: Boolean = false, forceUpload: Boolean = false, quiet: Boolean = true) {
+        if (!account.isSignedIn) return
+        lastSyncAttempt = SystemClock.elapsedRealtime()
+        try {
+            if (sync.sync(firstTime, forceUpload)) seenAtUpload = seen.size
+            _state.update { it.copy(account = it.account.copy(lastSyncedAt = account.syncedAt)) }
+        } catch (e: SignedOutException) {
+            _state.update { it.copy(account = AccountState(error = e.message)) }
+            if (!quiet) throw e
+        } catch (e: Exception) {
+            if (!quiet) throw e
+        }
+    }
+
+    /** Uploads a few seconds after liked cards, sources or settings change on this phone. */
+    private suspend fun syncWhenChanged() {
+        _state.map { listOf(it.saved, it.subreddits, it.newsFeeds, it.reading, it.showNsfw, it.storyMode) }
+            .distinctUntilChanged()
+            .debounce(3_000)
+            .collect { if (account.isSignedIn && account.syncedFingerprint != syncFingerprint()) runSync() }
+    }
+
+    private fun syncSnapshot(): JSONObject = with(_state.value) {
+        JSONObject()
+            .put("liked", JSONArray().apply { saved.forEach { put(it.toJson()) } })
+            .put("subreddits", JSONArray(subreddits))
+            .put("newsFeeds", JSONArray(newsFeeds))
+            .put("seen", JSONArray(seen.toList().takeLast(SYNCED_SEEN)))
+            .put(
+                "settings",
+                JSONObject()
+                    .put("textScale", reading.textScale.toDouble())
+                    .put("serif", reading.serif)
+                    .put("showNsfw", showNsfw)
+                    .put("storyMode", storyMode.name),
+            )
+    }
+
+    /** The synced parts a person changes on purpose; the swiped history isn't one of them. */
+    private fun syncFingerprint(): String = with(_state.value) {
+        listOf(
+            saved.joinToString(",") { it.id },
+            subreddits.joinToString(","),
+            newsFeeds.joinToString(","),
+            reading.textScale,
+            reading.serif,
+            showNsfw,
+            storyMode.name,
+        ).joinToString("|")
+    }
+
+    private fun applySyncSnapshot(data: JSONObject, merge: Boolean) {
+        data.optJSONArray("seen")?.let { keys -> repeat(keys.length()) { seen.add(keys.getString(it)) } }
+        val liked = data.optJSONArray("liked")?.let { array ->
+            List(array.length()) { RedditPost.fromJson(array.getJSONObject(it)) }
+        }
+        val remoteSubreddits = data.optJSONArray("subreddits")?.let { a -> List(a.length()) { a.getString(it) } }
+        val remoteFeeds = data.optJSONArray("newsFeeds")?.let { a -> List(a.length()) { a.getString(it) } }
+        val settings = data.optJSONObject("settings")
+        _state.update { state ->
+            val storyMode = settings?.optString("storyMode")
+                ?.let { name -> ReadMode.STORY_MODES.firstOrNull { it.name == name } }
+                ?: state.storyMode
+            val updated = state.copy(
+                // When both phones changed, liked cards from both are kept.
+                saved = when {
+                    liked == null -> state.saved
+                    merge -> (state.saved + liked).distinctBy { it.id }
+                    else -> liked
+                },
+                subreddits = remoteSubreddits ?: state.subreddits,
+                newsFeeds = remoteFeeds ?: state.newsFeeds,
+                showNsfw = settings?.optBoolean("showNsfw", state.showNsfw) ?: state.showNsfw,
+                reading = ReadingSettings(
+                    textScale = settings?.optDouble("textScale")?.takeUnless { it.isNaN() }?.toFloat()
+                        ?: state.reading.textScale,
+                    serif = settings?.optBoolean("serif", state.reading.serif) ?: state.reading.serif,
+                ),
+                storyMode = storyMode,
+                readMode = if (state.readMode == ReadMode.News) ReadMode.News else storyMode,
+            )
+            // Cards the other phone already swiped leave this deck too.
+            updated.copy(deck = updated.deck.filter { card -> updated.allows(card) && card.seenKeys.none(seen::contains) })
+        }
+        with(_state.value) {
+            store.subreddits = subreddits
+            store.newsFeeds = newsFeeds
+            store.showNsfw = showNsfw
+            store.textScale = reading.textScale
+            store.serif = reading.serif
+            store.storyMode = storyMode.name
+            store.readMode = readMode.name
+        }
+        refillIfLow()
     }
 
     private fun takeReadingSeconds(): Int {
@@ -439,6 +613,9 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
 
         private val SUBREDDIT_NAME = Regex("[A-Za-z0-9_]{2,21}")
         private const val MAX_UNDO = 30
+        // Swiped-history keys sent with each upload; enough to keep a second phone from repeating recent cards.
+        private const val SYNCED_SEEN = 3000
+        private const val RESYNC_MS = 60_000L
         private const val MAX_DECK = 1000
         // Two keys per swiped story (ID and title), so about 5000 stories.
         private const val MAX_SEEN = 10000

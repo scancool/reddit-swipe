@@ -4,3 +4,17 @@ compatibility_date = "2025-06-01"
 
 # Secrets (set with `npx wrangler secret put <NAME>`, never committed):
 #   REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET
+
+[vars]
+# Sign-in codes come from this address; its domain must be onboarded in Email Service > Email Sending.
+SENDER = "Calm Read <signin@wannabeguru.com>"
+
+# Sign-in codes, sessions and synced snapshots (see src/account.js).
+# Create once with `npx wrangler kv namespace create ACCOUNTS` and put the printed id here.
+[[kv_namespaces]]
+binding = "ACCOUNTS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Cloudflare Email Service. Sending to any address (not just verified ones) needs the Workers Paid plan.
+[[send_email]]
+name = "EMAIL"

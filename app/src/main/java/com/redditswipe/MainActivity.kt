@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,6 +48,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
@@ -54,6 +57,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.redditswipe.share.CardSharer
+import com.redditswipe.ui.AccountScreen
 import com.redditswipe.ui.NewsSourcesScreen
 import com.redditswipe.ui.SavedScreen
 import com.redditswipe.ui.SettingsScreen
@@ -72,6 +77,7 @@ enum class Screen(val title: String, val icon: ImageVector) {
     News("News sources", Icons.Filled.Newspaper),
     Subreddits("Subreddits", Icons.Filled.Forum),
     Stats("Stats", Icons.Filled.BarChart),
+    Account("Account", Icons.Filled.AccountCircle),
     Settings("Settings", Icons.Filled.Settings),
 }
 
@@ -87,6 +93,7 @@ class MainActivity : ComponentActivity() {
                 var screen by rememberSaveable { mutableStateOf(Screen.Swipe) }
                 val drawerState = rememberDrawerState(DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
+                val context = LocalContext.current
                 val snackbar = remember { SnackbarHostState() }
 
                 val updates: UpdateViewModel = viewModel()
@@ -175,6 +182,15 @@ class MainActivity : ComponentActivity() {
                                             }
                                         },
                                         actions = {
+                                            if (screen == Screen.Swipe) {
+                                                val top = state.visibleDeck.firstOrNull()
+                                                IconButton(
+                                                    onClick = { top?.let { scope.launch { CardSharer.share(context, it) } } },
+                                                    enabled = top != null,
+                                                ) {
+                                                    Icon(Icons.Filled.Share, contentDescription = "Share this card")
+                                                }
+                                            }
                                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                                 Icon(Icons.Filled.Menu, contentDescription = "Menu")
                                             }
@@ -207,6 +223,7 @@ class MainActivity : ComponentActivity() {
                                             when (screen) {
                                                 Screen.Saved -> SavedScreen(
                                                     saved = state.saved,
+                                        onShare = { post -> scope.launch { CardSharer.share(context, post) } },
                                                     onRemove = { post ->
                                                         val index = state.saved.indexOf(post)
                                                         vm.removeSaved(post)
@@ -234,6 +251,14 @@ class MainActivity : ComponentActivity() {
                                                     onRestoreDefaults = vm::restoreDefaultSubreddits,
                                                 )
                                                 Screen.Stats -> StatsScreen(stats = state.stats)
+                                                Screen.Account -> AccountScreen(
+                                                    account = state.account,
+                                                    onRequestCode = vm::requestSignInCode,
+                                                    onVerifyCode = vm::verifySignInCode,
+                                                    onCancel = vm::cancelSignIn,
+                                                    onSyncNow = vm::syncNow,
+                                                    onSignOut = vm::signOut,
+                                                )
                                                 Screen.Settings -> SettingsScreen(
                                                     reading = state.reading,
                                                     showNsfw = state.showNsfw,

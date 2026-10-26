@@ -18,6 +18,10 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
   (`NEWS_FEEDS` in `data/NewsRepository.kt`). Sites marked "full" send whole articles; the rest send a headline and
   summary with a "Hold for full article ↗" link (a long press, so a stray tap never leaves the app). Feeds are read straight from the publishers.
 - A News / Stories switch above the cards picks what to deal; the ☰ menu picks the story length (All, Quick or Long).
+- Share (top bar, or on a Liked item) draws the card as an image (`share/CardSharer.kt`) and opens Android's share
+  sheet with the image plus the headline and link, so it works for Instagram as well as WhatsApp, X and Messages.
+- Optional account (☰ → Account): sign in with a 6-digit code sent by email, and liked cards, sources, settings and the
+  swiped history sync across phones (`data/AccountRepository.kt`, `data/AccountSync.kt`, `relay/src/account.js`).
 - Text size is one setting: pinch a card with two fingers or use A−/A+ in Settings.
 - Removing a saved post shows an Undo.
 - ↶ at the top left undoes the last swipe (up to 30).
@@ -69,6 +73,12 @@ approval, so the app talks to a Cloudflare Worker at `https://reddit-swipe-relay
 The Worker uses an existing Reddit "web app" (client credentials) whose ID and secret are stored as
 Worker secrets, never in this repo. It only serves subreddit listings (`GET /r/<sub>/hot|new|top|rising`)
 and caches responses for 2 minutes.
+
+It also serves the optional accounts (`relay/src/account.js`): sign-in codes are emailed with Cloudflare Email Service
+from `signin@wannabeguru.com`, and codes, sessions and synced snapshots live in the `ACCOUNTS` KV namespace. Setup, once:
+1. Cloudflare dashboard → Compute → Email Service → Email Sending → Onboard Domain → wannabeguru.com.
+2. Sending to any address needs the Workers Paid plan; on the free plan only verified addresses receive codes.
+3. `npx wrangler kv namespace create ACCOUNTS` and put the id in `relay/wrangler.toml`.
 
 Redeploy after changing it:
 ```bash
