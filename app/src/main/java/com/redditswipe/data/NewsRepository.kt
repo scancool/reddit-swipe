@@ -30,6 +30,9 @@ val NEWS_FEEDS = listOf(
 /** Feeds switched on until the user picks their own. */
 val DEFAULT_NEWS_FEEDS = listOf("The Conversation", "ProPublica", "BBC News", "The Guardian")
 
+/** News older than this leaves the deck (saved articles stay), so a few days away doesn't mean reading last week's news. */
+const val NEWS_MAX_AGE_MS = 48 * 60 * 60 * 1000L
+
 fun newsFeed(name: String) = NEWS_FEEDS.firstOrNull { it.name == name }
 
 /**

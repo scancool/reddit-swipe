@@ -263,6 +263,11 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onAppVisible() {
         if (visibleSince == null) visibleSince = SystemClock.elapsedRealtime()
+        // The app can sit in the background for days; news that went stale meanwhile leaves the deck.
+        if (restored && _state.value.deck.any { it.isStaleNews() }) {
+            _state.update { state -> state.copy(deck = state.deck.filter { state.allows(it) }) }
+            refillIfLow()
+        }
     }
 
     fun onAppHidden() {
@@ -364,7 +369,7 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun SwipeUiState.allows(post: RedditPost): Boolean = when {
-        post.isNews -> post.subreddit in newsFeeds
+        post.isNews -> post.subreddit in newsFeeds && !post.isStaleNews()
         else -> (showNsfw || !post.isNsfw) && subreddits.any { it.equals(post.subreddit, ignoreCase = true) }
     }
 
