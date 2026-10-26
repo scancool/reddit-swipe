@@ -1,0 +1,15 @@
+name = "calm-read-mailer"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+# Andrebellapro's account: Cloudflare only sends from domains in the Worker's own account, and
+# wannabeguru.com lives here while the relay runs in Abella360's account.
+account_id = "6646c9a4473bb8fd48897676e1849b3e"
+
+# Secret (set with `npx wrangler secret put MAILER_SECRET`, same value as the relay's): MAILER_SECRET
+
+[vars]
+SENDER = "Calm Read <signin@wannabeguru.com>"
+
+# Cloudflare Email Service. Sending to any address (not just verified ones) needs the Workers Paid plan.
+[[send_email]]
+name = "EMAIL"

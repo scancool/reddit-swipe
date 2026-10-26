@@ -1,20 +1,20 @@
 name = "reddit-swipe-relay"
 main = "src/index.js"
 compatibility_date = "2025-06-01"
+# Abella360's account, where the Worker runs and wannabeguru.com sends sign-in email.
+account_id = "3f324c8103f28aee2560dc588bae6df8"
 
 # Secrets (set with `npx wrangler secret put <NAME>`, never committed):
 #   REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET
+#   MAILER_SECRET (same value as the mailer Worker's)
 
 [vars]
-# Sign-in codes come from this address; its domain must be onboarded in Email Service > Email Sending.
-SENDER = "Calm Read <signin@wannabeguru.com>"
+# Sign-in codes are emailed by the mailer Worker (relay/mailer) in the account that owns wannabeguru.com.
+MAILER_URL = "https://calm-read-mailer.abpro.workers.dev"
 
 # Sign-in codes, sessions and synced snapshots (see src/account.js).
 # Create once with `npx wrangler kv namespace create ACCOUNTS` and put the printed id here.
 [[kv_namespaces]]
 binding = "ACCOUNTS"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "75a3a7a911f94a6d96f2918f6961576b"
 
-# Cloudflare Email Service. Sending to any address (not just verified ones) needs the Workers Paid plan.
-[[send_email]]
-name = "EMAIL"

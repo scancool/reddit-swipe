@@ -74,8 +74,9 @@ The Worker uses an existing Reddit "web app" (client credentials) whose ID and s
 Worker secrets, never in this repo. It only serves subreddit listings (`GET /r/<sub>/hot|new|top|rising`)
 and caches responses for 2 minutes.
 
-It also serves the optional accounts (`relay/src/account.js`): sign-in codes are emailed with Cloudflare Email Service
-from `signin@wannabeguru.com`, and codes, sessions and synced snapshots live in the `ACCOUNTS` KV namespace. Setup, once:
+It also serves the optional accounts (`relay/src/account.js`): sign-in codes are emailed with Cloudflare Email Service by the
+mailer Worker (`relay/mailer`, in the Andrebellapro account that owns wannabeguru.com; the relay is in Abella360's) from
+`signin@wannabeguru.com`, and codes, sessions and synced snapshots live in the `ACCOUNTS` KV namespace. Setup, once:
 1. Cloudflare dashboard → Compute → Email Service → Email Sending → Onboard Domain → wannabeguru.com.
 2. Sending to any address needs the Workers Paid plan; on the free plan only verified addresses receive codes.
 3. `npx wrangler kv namespace create ACCOUNTS` and put the id in `relay/wrangler.toml`.

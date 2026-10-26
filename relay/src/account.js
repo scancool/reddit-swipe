@@ -54,17 +54,20 @@ async function sendCode(request, env) {
     { expirationTtl: CODE_TTL_SECONDS },
   );
   await env.ACCOUNTS.put(`sent:${email}`, "1", { expirationTtl: RESEND_WAIT_SECONDS });
-  try {
-    await env.EMAIL.send({
-      from: env.SENDER,
+  // Sent by the mailer Worker (relay/mailer), which lives in the account that owns the sending domain.
+  const mailer = await fetch(env.MAILER_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.MAILER_SECRET}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
       to: email,
       subject: `${code} is your Calm Read code`,
       text: `Your Calm Read sign-in code is ${code}\n\nIt works for 10 minutes. If you didn't ask for it, ignore this email.`,
       html: `<p>Your Calm Read sign-in code is</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px">${code}</p>` +
         `<p>It works for 10 minutes. If you didn't ask for it, ignore this email.</p>`,
-    });
-  } catch (error) {
-    console.error("Email sending failed:", error.code, error.message);
+    }),
+  });
+  if (!mailer.ok) {
+    console.error("Mailer failed:", mailer.status, await mailer.text());
     await env.ACCOUNTS.delete(`sent:${email}`);
     throw new HttpError(502, "Couldn't send the email. Check the address and try again.");
   }
