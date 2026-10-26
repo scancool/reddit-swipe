@@ -14,9 +14,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,12 +30,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.redditswipe.BuildConfig
+import com.redditswipe.ReadMode
 import com.redditswipe.ReadingSettings
 import kotlin.math.roundToInt
 
 // Steps for the A−/A+ buttons; pinching a card can land anywhere between MIN_TEXT_SCALE and MAX_TEXT_SCALE.
 private val TEXT_SCALES = listOf(MIN_TEXT_SCALE, 0.85f, 1f, 1.15f, 1.3f, 1.5f, 1.75f, 2f, MAX_TEXT_SCALE)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     reading: ReadingSettings,
@@ -40,6 +46,8 @@ fun SettingsScreen(
     isDownloading: Boolean,
     onTextScale: (Float) -> Unit,
     onSerif: (Boolean) -> Unit,
+    storyMode: ReadMode,
+    onStoryMode: (ReadMode) -> Unit,
     onShowNsfw: (Boolean) -> Unit,
     onDownload: () -> Unit,
     modifier: Modifier = Modifier,
@@ -84,7 +92,24 @@ fun SettingsScreen(
         }
 
         Divider()
-        SectionTitle("Content")
+        SectionTitle("Stories")
+        Text("Story length", Modifier.padding(bottom = 8.dp))
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            ReadMode.STORY_MODES.forEachIndexed { index, mode ->
+                SegmentedButton(
+                    selected = mode == storyMode,
+                    onClick = { onStoryMode(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(index, ReadMode.STORY_MODES.size),
+                    label = { Text(mode.label) },
+                )
+            }
+        }
+        Text(
+            "What Stories deals: quick reads (short posts like shower thoughts), long stories, or all of them.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+        )
         SettingSwitch("Show NSFW stories", showNsfw, onShowNsfw)
 
         Divider()

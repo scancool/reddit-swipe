@@ -21,6 +21,7 @@ data class NewsFeed(val name: String, val url: String, val category: NewsCategor
  * AllSides) and are only a rough guide.
  */
 enum class NewsCategory(val label: String) {
+    Local("Local: Mazatlán"),
     Center("Center"),
     Liberal("Liberal"),
     Conservative("Conservative"),
@@ -32,6 +33,15 @@ enum class NewsCategory(val label: String) {
 }
 
 val NEWS_FEEDS = listOf(
+    NewsFeed("Mazatlán Interactivo", "https://mazatlaninteractivo.com.mx/feed/", NewsCategory.Local, fullText = true),
+    NewsFeed("Línea Directa", "https://lineadirectaportal.com/feed/", NewsCategory.Local),
+    // Headlines about the city from every outlet Google News finds (El Universal, Reforma, Noroeste...).
+    NewsFeed(
+        "Google News: Mazatlán",
+        "https://news.google.com/rss/search?q=Mazatl%C3%A1n&hl=es-419&gl=MX&ceid=MX:es-419",
+        NewsCategory.Local,
+    ),
+
     NewsFeed("BBC News", "https://feeds.bbci.co.uk/news/rss.xml", NewsCategory.Center),
     NewsFeed("The Hill", "https://thehill.com/feed/", NewsCategory.Center),
     NewsFeed("Axios", "https://api.axios.com/feed/", NewsCategory.Center, fullText = true),
@@ -164,7 +174,7 @@ class NewsRepository {
             id = "news:$link",
             subreddit = feed.name,
             title = title,
-            body = body.takeUnless { it == title }.orEmpty(),
+            body = body.takeUnless { isJustTheHeadline(it, title) }.orEmpty(),
             author = fields["creator"].orEmpty(),
             score = 0,
             numComments = 0,
@@ -174,6 +184,13 @@ class NewsRepository {
             publishedAt = parseDate(fields["pubDate"] ?: fields["published"] ?: fields["updated"] ?: fields["date"]),
         )
     }
+
+    /**
+     * True when the "summary" only repeats the headline, as Google News does ("Headline - Outlet" over
+     * "Headline  Outlet"), so the card shows the headline alone.
+     */
+    private fun isJustTheHeadline(body: String, title: String): Boolean =
+        body == title || (body.length < title.length + 40 && body.startsWith(title.substringBeforeLast(" - ")))
 
     private fun parseDate(text: String?): Long {
         if (text == null) return 0L

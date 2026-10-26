@@ -12,14 +12,15 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 - Swipe left: skip. Until the first swipe, a hint under the card says which way does what.
 - Only story-length text posts (300+ characters) from story subreddits like TrueOffMyChest, tifu and AITAH; no question subs where the content is in the comments.
 - Quick-read subreddits (Showerthoughts, LifeProTips, YouShouldKnow, Jokes, DadJokes) keep short posts too, shown in larger centered type; add them from the chips on the Subreddits screen (`QUICK_READ_SUBREDDITS` in `data/RedditRepository.kt`).
-- News articles too, from about 35 sites grouped into Center, Liberal, Conservative, World, Business, Tech,
+- News articles too, from about 35 sites grouped into Local (Mazatlán: Mazatlán Interactivo, Línea Directa and a Google
+  News search for the city), Center, Liberal, Conservative, World, Business, Tech,
   Science & health and Sports. The News sources screen switches a whole category or single sites on and off
   (`NEWS_FEEDS` in `data/NewsRepository.kt`). Sites marked "full" send whole articles; the rest send a headline and
   summary with a "Hold for full article ↗" link (a long press, so a stray tap never leaves the app). Feeds are read straight from the publishers.
-- A News / Stories switch above the cards picks what to deal; under Stories, chips pick All, Quick or Long. Both are remembered.
+- A News / Stories switch above the cards picks what to deal; Settings picks the story length (All, Quick or Long).
 - Text size is one setting: pinch a card with two fingers or use A−/A+ in Settings.
 - Removing a saved post shows an Undo.
-- ↶ in the top bar undoes the last swipe (up to 30).
+- ↶ at the top left undoes the last swipe (up to 30).
 - ☰ menu, top right: Swipe, Saved, News sources, Subreddits, Stats (stories and minutes read per day), Settings
   (text size, serif font, NSFW stories, download stories for offline reading).
 - Saved posts, swiped history (so stories don't repeat), the unread deck (offline cache) and stats are kept on the phone.

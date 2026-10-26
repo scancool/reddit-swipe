@@ -224,6 +224,17 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         refillIfLow()
     }
 
+    /** Picks the story length (All, Quick or Long) in Settings; applies at once if Stories is showing. */
+    fun setStoryMode(mode: ReadMode) {
+        if (mode == ReadMode.News) return
+        if (_state.value.readMode == ReadMode.News) {
+            store.storyMode = mode.name
+            _state.update { it.copy(storyMode = mode) }
+        } else {
+            setReadMode(mode)
+        }
+    }
+
     fun setTextScale(scale: Float) {
         store.textScale = scale
         _state.update { it.copy(reading = it.reading.copy(textScale = scale)) }

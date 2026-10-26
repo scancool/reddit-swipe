@@ -133,12 +133,14 @@ class MainActivity : ComponentActivity() {
                                 topBar = {
                                     TopAppBar(
                                         title = { Text(screen.title) },
-                                        actions = {
+                                        navigationIcon = {
                                             if (screen == Screen.Swipe) {
                                                 IconButton(onClick = vm::undo, enabled = state.canUndo) {
                                                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo last swipe")
                                                 }
                                             }
+                                        },
+                                        actions = {
                                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                                 Icon(Icons.Filled.Menu, contentDescription = "Menu")
                                             }
@@ -198,6 +200,8 @@ class MainActivity : ComponentActivity() {
                                         isDownloading = state.isDownloading,
                                         onTextScale = vm::setTextScale,
                                         onSerif = vm::setSerif,
+                                        storyMode = state.storyMode,
+                                        onStoryMode = vm::setStoryMode,
                                         onShowNsfw = vm::setShowNsfw,
                                         onDownload = vm::downloadForOffline,
                                         modifier = content,

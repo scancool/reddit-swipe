@@ -10,7 +10,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -220,8 +218,8 @@ fun SwipeScreen(
 }
 
 /**
- * News | Stories, centered above the deck and no wider than a card. Under Stories, chips pick the
- * length (All, Quick, Long); Stories reopens on whichever length was picked last.
+ * News | Stories, centered above the deck and no wider than a card. Stories deals the length picked
+ * in Settings (All, Quick or Long).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -232,30 +230,17 @@ private fun ReadModeSwitch(
     modifier: Modifier = Modifier,
 ) {
     val isNews = mode == ReadMode.News
-    Column(modifier.widthIn(max = MaxCardWidth).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            listOf(true to "News", false to "Stories").forEachIndexed { index, (news, label) ->
-                SegmentedButton(
-                    selected = news == isNews,
-                    onClick = { onChange(if (news) ReadMode.News else storyMode) },
-                    shape = SegmentedButtonDefaults.itemShape(index, 2),
-                    // No checkmark: the fill already shows the choice.
-                    icon = {},
-                    label = { Text(label, maxLines = 1) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        if (!isNews) {
-            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ReadMode.STORY_MODES.forEach { length ->
-                    FilterChip(
-                        selected = length == mode,
-                        onClick = { onChange(length) },
-                        label = { Text(length.label) },
-                    )
-                }
-            }
+    SingleChoiceSegmentedButtonRow(modifier.widthIn(max = MaxCardWidth).fillMaxWidth()) {
+        listOf(true to "News", false to "Stories").forEachIndexed { index, (news, label) ->
+            SegmentedButton(
+                selected = news == isNews,
+                onClick = { onChange(if (news) ReadMode.News else storyMode) },
+                shape = SegmentedButtonDefaults.itemShape(index, 2),
+                // No checkmark: the fill already shows the choice.
+                icon = {},
+                label = { Text(label, maxLines = 1) },
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
