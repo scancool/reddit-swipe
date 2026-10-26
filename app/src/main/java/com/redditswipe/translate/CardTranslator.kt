@@ -47,7 +47,7 @@ class CardTranslator {
     suspend fun detectLanguage(post: RedditPost): String? {
         val sample = post.title + "\n" + post.body.take(DETECT_SAMPLE_CHARS)
         val tag = identifier.identifyLanguage(sample).await()
-        if (tag == LanguageIdentification.UNDETERMINED_LANGUAGE_TAG) return null
+        if (tag == UNDETERMINED_LANGUAGE) return null
         return TranslateLanguage.fromLanguageTag(tag.substringBefore('-'))
     }
 
@@ -75,5 +75,8 @@ class CardTranslator {
     private companion object {
         // Enough text to tell the language apart without running detection over a whole article.
         const val DETECT_SAMPLE_CHARS = 600
+
+        // What language identification answers when it can't tell.
+        const val UNDETERMINED_LANGUAGE = "und"
     }
 }
