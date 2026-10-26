@@ -54,7 +54,7 @@ import kotlinx.coroutines.launch
 enum class Screen(val title: String, val icon: ImageVector) {
     Swipe("Swipe", Icons.Filled.Style),
     Saved("Saved", Icons.Filled.Bookmarks),
-    Subreddits("Subreddits", Icons.Filled.Forum),
+    Subreddits("Sources", Icons.Filled.Forum),
     Stats("Stats", Icons.Filled.BarChart),
     Settings("Settings", Icons.Filled.Settings),
 }
@@ -155,6 +155,8 @@ class MainActivity : ComponentActivity() {
                             )
                             Screen.Subreddits -> SubredditsScreen(
                                 subreddits = state.subreddits,
+                                newsFeeds = state.newsFeeds,
+                                onNewsFeed = vm::setNewsFeed,
                                 isChecking = state.isCheckingSubreddit,
                                 error = state.subredditError,
                                 onAdd = vm::addSubreddit,

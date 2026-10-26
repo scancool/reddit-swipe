@@ -4,12 +4,16 @@ import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.redditswipe.data.DEFAULT_NEWS_FEEDS
 import com.redditswipe.data.DayStats
 import com.redditswipe.data.LocalStore
+import com.redditswipe.data.NEWS_FEEDS
+import com.redditswipe.data.NewsRepository
 import com.redditswipe.data.QUICK_READ_SUBREDDITS
 import com.redditswipe.data.isQuickReadSubreddit
 import com.redditswipe.data.RedditPost
 import com.redditswipe.data.RedditRepository
+import com.redditswipe.data.newsFeed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.async
@@ -27,24 +31,29 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
-/** Which stories the swipe screen deals: short posts, long stories, or both mixed together. */
+/** Which cards the swipe screen deals: short posts, long stories, news, or everything mixed together. */
 enum class ReadMode(val label: String) {
-    Quick("Quick reads"),
+    Quick("Quick"),
     Mixed("Mixed"),
-    Long("Long reads"),
+    Long("Long"),
+    News("News"),
     ;
 
     fun allows(post: RedditPost) = when (this) {
         Quick -> post.isQuickRead
         Mixed -> true
-        Long -> !post.isQuickRead
+        Long -> !post.isNews && !post.isQuickRead
+        News -> post.isNews
     }
 
     fun allowsSubreddit(name: String) = when (this) {
         Quick -> isQuickReadSubreddit(name)
         Mixed -> true
         Long -> !isQuickReadSubreddit(name)
+        News -> false
     }
+
+    val includesNews: Boolean get() = this == Mixed || this == News
 }
 
 data class ReadingSettings(val textScale: Float = 1f, val serif: Boolean = false, val bodyZoom: Float = 1f)
@@ -53,6 +62,7 @@ data class SwipeUiState(
     val deck: List<RedditPost> = emptyList(),
     val saved: List<RedditPost> = emptyList(),
     val subreddits: List<String> = emptyList(),
+    val newsFeeds: List<String> = emptyList(),
     val showNsfw: Boolean = true,
     val reading: ReadingSettings = ReadingSettings(),
     val stats: Map<String, DayStats> = emptyMap(),
@@ -73,17 +83,22 @@ data class SwipeUiState(
 
     /** The subreddits that can supply cards in the current [readMode]. */
     val modeSubreddits: List<String> get() = subreddits.filter(readMode::allowsSubreddit)
+
+    /** The news feeds that can supply cards in the current [readMode]. */
+    val modeNewsFeeds: List<String> get() = if (readMode.includesNews) newsFeeds else emptyList()
 }
 
 @OptIn(FlowPreview::class)
 class SwipeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = RedditRepository()
+    private val news = NewsRepository()
     private val store = LocalStore(app)
 
     private val _state = MutableStateFlow(
         SwipeUiState(
             subreddits = store.subreddits ?: DEFAULT_SUBREDDITS,
+            newsFeeds = store.newsFeeds ?: DEFAULT_NEWS_FEEDS,
             showNsfw = store.showNsfw,
             reading = ReadingSettings(store.textScale, store.serif, store.bodyZoom),
             readMode = ReadMode.entries.firstOrNull { it.name == store.readMode } ?: ReadMode.Mixed,
@@ -235,6 +250,17 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         loadMore()
     }
 
+    fun setNewsFeed(name: String, on: Boolean) {
+        _state.update { state ->
+            // Kept in NEWS_FEEDS order so the list reads the same however it was toggled.
+            val feeds = NEWS_FEEDS.map { it.name }.filter { if (it == name) on else it in state.newsFeeds }
+            val updated = state.copy(newsFeeds = feeds)
+            updated.copy(deck = updated.deck.filter { updated.allows(it) })
+        }
+        store.newsFeeds = _state.value.newsFeeds
+        if (on) loadMore() else refillIfLow()
+    }
+
     fun onAppVisible() {
         if (visibleSince == null) visibleSince = SystemClock.elapsedRealtime()
     }
@@ -273,7 +299,7 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Fetches a few more pages from every subreddit so there is plenty to read offline. */
+    /** Fetches a few more pages from every subreddit (and the news feeds) so there is plenty to read offline. */
     fun downloadForOffline() {
         if (_state.value.isDownloading) return
         _state.update { it.copy(isDownloading = true) }
@@ -285,15 +311,18 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Adds one page from each subreddit that suits [mode] to the deck; returns an error message if
-     * nothing came back.
+     * Adds one page from each subreddit and news feed that suits [mode] to the deck; returns an error
+     * message if nothing came back.
      */
     private suspend fun fetchRound(mode: ReadMode): String? = fetchMutex.withLock {
         val subreddits = _state.value.subreddits.filter(mode::allowsSubreddit)
-        if (subreddits.isEmpty()) return "Add some subreddits in the menu"
+        val feeds = if (mode.includesNews) _state.value.newsFeeds.mapNotNull(::newsFeed) else emptyList()
+        if (subreddits.isEmpty() && feeds.isEmpty()) return "Add some subreddits or news sources in the menu"
         val results = subreddits.map { sub ->
             viewModelScope.async { runCatching { repository.fetchTextPosts(sub, limit = 25) } }
-        }.awaitAll()
+        }.plus(feeds.map { feed ->
+            viewModelScope.async { runCatching { news.fetchArticles(feed) } }
+        }).awaitAll()
         val posts = results.flatMap { it.getOrDefault(emptyList()) }.shuffled()
 
         var added = 0
@@ -334,8 +363,10 @@ class SwipeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun SwipeUiState.allows(post: RedditPost): Boolean =
-        (showNsfw || !post.isNsfw) && subreddits.any { it.equals(post.subreddit, ignoreCase = true) }
+    private fun SwipeUiState.allows(post: RedditPost): Boolean = when {
+        post.isNews -> post.subreddit in newsFeeds
+        else -> (showNsfw || !post.isNsfw) && subreddits.any { it.equals(post.subreddit, ignoreCase = true) }
+    }
 
     private fun Map<String, DayStats>.adjustToday(stories: Int, seconds: Int): Map<String, DayStats> {
         val today = LocalDate.now().toString()

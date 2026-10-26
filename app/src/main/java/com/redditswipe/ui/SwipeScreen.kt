@@ -40,6 +40,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -100,6 +101,7 @@ fun SwipeScreen(
     modifier: Modifier = Modifier,
 ) {
     val view = LocalView.current
+    val uriHandler = LocalUriHandler.current
     val density = LocalDensity.current
     val deck = state.visibleDeck
     val top = deck.firstOrNull()
@@ -200,6 +202,7 @@ fun SwipeScreen(
                             },
                         transform = if (isTop) topTransform else backTransform,
                         onBodyZoom = if (isTop) onBodyZoom else null,
+                        onOpen = if (isTop && post.isNews) ({ uriHandler.openUri(post.url) }) else null,
                     )
                 }
             }
@@ -216,7 +219,7 @@ fun SwipeScreen(
     }
 }
 
-/** Quick reads | Mixed | Long reads, centered above the deck and no wider than a card. */
+/** Quick | Mixed | Long | News, centered above the deck and no wider than a card. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReadModeSwitch(mode: ReadMode, onChange: (ReadMode) -> Unit, modifier: Modifier = Modifier) {

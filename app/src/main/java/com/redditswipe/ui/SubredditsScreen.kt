@@ -3,6 +3,8 @@ package com.redditswipe.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,10 +18,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,11 +42,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.redditswipe.data.NEWS_FEEDS
 import com.redditswipe.data.QUICK_READ_SUBREDDITS
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SubredditsScreen(
     subreddits: List<String>,
+    newsFeeds: List<String>,
+    onNewsFeed: (name: String, on: Boolean) -> Unit,
     isChecking: Boolean,
     error: String?,
     onAdd: (String) -> Unit,
@@ -55,6 +63,38 @@ fun SubredditsScreen(
     LaunchedEffect(subreddits.size) { input = "" }
 
     Column(modifier.fillMaxSize()) {
+        Text(
+            "News",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp),
+        )
+        FlowRow(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            NEWS_FEEDS.forEach { feed ->
+                val on = feed.name in newsFeeds
+                FilterChip(
+                    selected = on,
+                    onClick = { onNewsFeed(feed.name, !on) },
+                    label = { Text(feed.name) },
+                    leadingIcon = if (on) {
+                        { Icon(Icons.Filled.Check, contentDescription = null, Modifier.size(18.dp)) }
+                    } else {
+                        null
+                    },
+                )
+            }
+        }
+        Text(
+            "The Conversation and ProPublica send whole articles; the others send a headline and summary, " +
+                "with a link to the full story. Pick News above the cards to read only news.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        HorizontalDivider(Modifier.padding(top = 12.dp))
         Row(
             Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,

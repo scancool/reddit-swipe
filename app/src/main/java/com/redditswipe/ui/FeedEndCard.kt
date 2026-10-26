@@ -49,19 +49,22 @@ fun FeedEndCard(
     modifier: Modifier = Modifier,
 ) {
     when {
-        state.modeSubreddits.isEmpty() -> MessageCard(
+        state.modeSubreddits.isEmpty() && state.modeNewsFeeds.isEmpty() -> MessageCard(
             icon = Icons.Filled.Forum,
             title = when {
-                state.subreddits.isEmpty() -> "Pick some subreddits"
+                state.readMode == ReadMode.News -> "No news sources"
+                state.subreddits.isEmpty() && state.newsFeeds.isEmpty() -> "Pick some sources"
                 state.readMode == ReadMode.Quick -> "No quick-read subreddits"
                 else -> "No story subreddits"
             },
             detail = when {
-                state.subreddits.isEmpty() -> "Stories come from the subreddits you choose."
+                state.readMode == ReadMode.News -> "Switch on a news site like BBC News or The Conversation."
+                state.subreddits.isEmpty() && state.newsFeeds.isEmpty() ->
+                    "Stories come from the subreddits and news sites you choose."
                 state.readMode == ReadMode.Quick -> "Add one like r/Showerthoughts from the Quick reads list."
                 else -> "Add a story subreddit like r/tifu, or switch to Mixed."
             },
-            action = "Choose subreddits",
+            action = "Choose sources",
             onAction = onOpenSubreddits,
             modifier = modifier,
         )
@@ -78,7 +81,7 @@ fun FeedEndCard(
         else -> MessageCard(
             icon = Icons.Filled.DoneAll,
             title = "You're all caught up",
-            detail = if (state.isExhausted) "No new stories right now. Check back later, or add more subreddits."
+            detail = if (state.isExhausted) "No new stories right now. Check back later, or add more sources."
             else "That's everything loaded for now.",
             action = "Check for new stories",
             onAction = onRetry,

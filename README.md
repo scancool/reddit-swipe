@@ -11,10 +11,13 @@ A calmer replacement for Instagram and other image-heavy social apps: something 
 - Swipe left: skip.
 - Only story-length text posts (300+ characters) from story subreddits like TrueOffMyChest, tifu and AITAH; no question subs where the content is in the comments.
 - Quick-read subreddits (Showerthoughts, LifeProTips, YouShouldKnow, Jokes, DadJokes) keep short posts too, shown in larger centered type; add them from the chips on the Subreddits screen (`QUICK_READ_SUBREDDITS` in `data/RedditRepository.kt`).
-- A Quick reads / Mixed / Long reads switch above the cards picks which kind of post to deal; it's remembered.
+- News articles too: The Conversation and ProPublica (whole articles), plus BBC News, The Guardian, NPR, Ars Technica,
+  Al Jazeera and the New York Times (headline and summary, with a "Full article ↗" link). Switch them on or off under
+  News on the Sources screen (`NEWS_FEEDS` in `data/NewsRepository.kt`). Feeds are read straight from the publishers.
+- A Quick / Mixed / Long / News switch above the cards picks which kind of card to deal; it's remembered.
 - Pinch the story text with two fingers to zoom it (the title stays put); Settings shows the zoom and can reset it.
 - ↶ in the top bar undoes the last swipe (up to 30); ♡ next to it saves the current story, like swiping right.
-- ☰ menu: Swipe, Saved, Subreddits (add/remove), Stats (stories and minutes read per day), Settings
+- ☰ menu: Swipe, Saved, Sources (news sites and subreddits), Stats (stories and minutes read per day), Settings
   (text size, serif font, NSFW stories, download stories for offline reading).
 - Saved posts, swiped history (so stories don't repeat), the unread deck (offline cache) and stats are kept on the phone.
 
@@ -47,6 +50,7 @@ the same release key. The key lives outside this repo in `../reddit-swipe-signin
 
 ## Code map
 - `app/src/main/java/com/redditswipe/data/RedditRepository.kt`: fetches listings and keeps only story-length text posts, flagging NSFW ones
+- `data/NewsRepository.kt`: reads the news sites' RSS/Atom feeds and turns articles into plain-text cards
 - `SwipeViewModel.kt`: the card deck, saved list, NSFW setting, and the subreddits to pull from (edit `storySubreddits` / `nsfwSubreddits`)
 - `ui/SwipeCard.kt`: the story card (typography, SAVE/SKIP stamps) and `CardSwipeState` (swipe thresholds and decisions)
 - `ui/SwipeScreen.kt`: card stack, read-mode switch, drag/fling gestures and exit animations

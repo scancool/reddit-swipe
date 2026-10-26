@@ -27,6 +27,11 @@ class LocalStore(context: Context) {
         get() = prefs.getString("subreddits", null)?.split(",")?.filter { it.isNotBlank() }
         set(value) = prefs.edit().putString("subreddits", value?.joinToString(",")).apply()
 
+    /** Names of the switched-on [NEWS_FEEDS]; null until the user changes them, so the defaults apply. */
+    var newsFeeds: List<String>?
+        get() = prefs.getString("news_feeds", null)?.split(",")?.filter { it.isNotBlank() }
+        set(value) = prefs.edit().putString("news_feeds", value?.joinToString(",")).apply()
+
     var textScale: Float
         get() = prefs.getFloat("text_scale", 1f)
         set(value) = prefs.edit().putFloat("text_scale", value).apply()

@@ -1,0 +1,166 @@
+package com.redditswipe.data
+
+import android.os.SystemClock
+import android.util.Xml
+import androidx.core.text.HtmlCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.xmlpull.v1.XmlPullParser
+import java.net.HttpURLConnection
+import java.net.URL
+import java.time.OffsetDateTime
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.util.concurrent.ConcurrentHashMap
+
+/** A news site's RSS or Atom feed. [fullText] feeds carry whole articles; the rest a headline and summary. */
+data class NewsFeed(val name: String, val url: String, val fullText: Boolean)
+
+val NEWS_FEEDS = listOf(
+    NewsFeed("The Conversation", "https://theconversation.com/us/articles.atom", fullText = true),
+    NewsFeed("ProPublica", "https://feeds.propublica.org/propublica/main", fullText = true),
+    NewsFeed("BBC News", "https://feeds.bbci.co.uk/news/rss.xml", fullText = false),
+    NewsFeed("The Guardian", "https://www.theguardian.com/world/rss", fullText = false),
+    NewsFeed("NPR", "https://feeds.npr.org/1001/rss.xml", fullText = false),
+    NewsFeed("Ars Technica", "https://feeds.arstechnica.com/arstechnica/index", fullText = false),
+    NewsFeed("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml", fullText = false),
+    NewsFeed("New York Times", "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", fullText = false),
+)
+
+/** Feeds switched on until the user picks their own. */
+val DEFAULT_NEWS_FEEDS = listOf("The Conversation", "ProPublica", "BBC News", "The Guardian")
+
+fun newsFeed(name: String) = NEWS_FEEDS.firstOrNull { it.name == name }
+
+/**
+ * Reads news feeds straight from the publishers (they're public, so no relay is needed) and turns each
+ * article into a text card. Images, captions and "continue reading" links are dropped.
+ */
+class NewsRepository {
+
+    // When each feed was last downloaded. A feed lists the same articles until it updates, and the
+    // full-text ones are large, so refills within REFETCH_MS skip it.
+    private val fetchedAt = ConcurrentHashMap<String, Long>()
+
+    suspend fun fetchArticles(feed: NewsFeed): List<RedditPost> = withContext(Dispatchers.IO) {
+        val now = SystemClock.elapsedRealtime()
+        if (fetchedAt[feed.name]?.let { now - it < REFETCH_MS } == true) return@withContext emptyList()
+        val connection = (URL(feed.url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000
+            readTimeout = 15_000
+            // Some publishers turn away Java's default user agent.
+            setRequestProperty("User-Agent", "Mozilla/5.0 (Android) RedditSwipe")
+        }
+        try {
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                throw RedditException("${feed.name} returned HTTP ${connection.responseCode}")
+            }
+            connection.inputStream.use { parseFeed(it, feed) }.also { fetchedAt[feed.name] = now }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    /** Handles RSS 2.0 (`<item>`) and Atom (`<entry>`) alike, keyed by local tag names. */
+    private fun parseFeed(input: java.io.InputStream, feed: NewsFeed): List<RedditPost> {
+        val parser = Xml.newPullParser().apply {
+            setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
+            setInput(input, null)
+        }
+        val articles = mutableListOf<RedditPost>()
+        var item: MutableMap<String, String>? = null
+        var inAuthor = false
+        while (parser.next() != XmlPullParser.END_DOCUMENT) {
+            val tag = parser.name
+            when (parser.eventType) {
+                XmlPullParser.START_TAG -> when {
+                    tag == "item" || tag == "entry" -> item = mutableMapOf()
+                    item == null -> {}
+                    tag == "author" -> inAuthor = true
+                    // Atom puts the article URL in an attribute; skip enclosures and comment links.
+                    tag == "link" && parser.getAttributeValue(null, "href") != null -> {
+                        val rel = parser.getAttributeValue(null, "rel")
+                        if (rel == null || rel == "alternate") item.putIfAbsent("link", parser.getAttributeValue(null, "href"))
+                    }
+                    tag in FIELDS -> {
+                        // nextText fails on embedded XHTML; that field is just left out.
+                        val text = runCatching { parser.nextText() }.getOrNull()?.trim()
+                        val key = if (tag == "name" && inAuthor) "creator" else tag
+                        if (!text.isNullOrEmpty() && (tag != "name" || inAuthor)) item.putIfAbsent(key, text)
+                    }
+                }
+                XmlPullParser.END_TAG -> when (tag) {
+                    "author" -> inAuthor = false
+                    "item", "entry" -> {
+                        item?.let { toArticle(it, feed) }?.let(articles::add)
+                        item = null
+                    }
+                }
+            }
+        }
+        return articles
+    }
+
+    private fun toArticle(fields: Map<String, String>, feed: NewsFeed): RedditPost? {
+        val link = fields["link"] ?: fields["guid"]?.takeIf { it.startsWith("http") } ?: return null
+        val title = fields["title"]?.let { htmlToText(it) }?.takeIf { it.isNotBlank() } ?: return null
+        // Prefer the full article, falling back to the summary when that's all there is.
+        val body = listOf("encoded", "content", "description", "summary")
+            .mapNotNull { fields[it]?.let { htmlToText(it) } }
+            .maxByOrNull { it.length }
+            .orEmpty()
+        return RedditPost(
+            id = "news:$link",
+            subreddit = feed.name,
+            title = title,
+            body = body.takeUnless { it == title }.orEmpty(),
+            author = fields["creator"].orEmpty(),
+            score = 0,
+            numComments = 0,
+            permalink = link,
+            isNsfw = false,
+            isNews = true,
+            publishedAt = parseDate(fields["pubDate"] ?: fields["published"] ?: fields["updated"] ?: fields["date"]),
+        )
+    }
+
+    private fun parseDate(text: String?): Long {
+        if (text == null) return 0L
+        return runCatching { ZonedDateTime.parse(text, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli() }
+            .recoverCatching { OffsetDateTime.parse(text).toInstant().toEpochMilli() }
+            .getOrDefault(0L)
+    }
+
+    private fun htmlToText(html: String): String {
+        val stripped = html
+            .replace(MEDIA_BLOCKS, "")
+            .replace(BOILERPLATE, "")
+        return HtmlCompat.fromHtml(stripped, HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
+            .replace('￼', ' ')
+            .lines()
+            .joinToString("\n") { it.trim() }
+            .replace(EXTRA_BLANK_LINES, "\n\n")
+            .trim()
+    }
+
+    private companion object {
+        const val REFETCH_MS = 10 * 60 * 1000L
+
+        val FIELDS = setOf("title", "link", "guid", "description", "encoded", "content", "summary",
+            "pubDate", "published", "updated", "date", "creator", "name")
+
+        // Pictures, their captions and anything that isn't prose.
+        val MEDIA_BLOCKS = Regex(
+            "<(figure|figcaption|script|style|iframe|video|audio)\\b.*?</\\1>|<img\\b[^>]*>",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+        )
+
+        // "Continue reading..." links (The Guardian) and "The post ... appeared first on ..." (WordPress).
+        val BOILERPLATE = Regex(
+            "<a\\b[^>]*>\\s*Continue reading\\.*\\s*</a>|<p>\\s*The post .*?appeared first on.*?</p>|<p>\\s*\\(Image credit:.*?\\)\\s*</p>",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+        )
+
+        val EXTRA_BLANK_LINES = Regex("\n{3,}")
+    }
+}

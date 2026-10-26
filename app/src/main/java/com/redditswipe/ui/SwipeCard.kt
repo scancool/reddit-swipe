@@ -1,5 +1,6 @@
 package com.redditswipe.ui
 
+import android.text.format.DateUtils
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
@@ -7,11 +8,13 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -33,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -161,7 +165,7 @@ fun backScale(dragProgress: Float): Float = BACK_SCALE + (1f - BACK_SCALE) * dra
  * runs in the card's single graphics layer, and [decision] (-1..1) fades in the SAVE/SKIP stamps.
  * Both are read only while drawing, so a moving card never recomposes or re-lays-out its text.
  * With [onBodyZoom], pinching with two fingers resizes the story text (never the title) and reports
- * the new zoom when the fingers lift.
+ * the new zoom when the fingers lift. [onOpen] adds a link to the full article under news cards.
  */
 @Composable
 fun SwipeCard(
@@ -171,6 +175,7 @@ fun SwipeCard(
     decision: (() -> Float)? = null,
     transform: GraphicsLayerScope.() -> Unit = {},
     onBodyZoom: ((Float) -> Unit)? = null,
+    onOpen: (() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val isShort = post.body.length < SHORT_POST_CHARS
@@ -204,9 +209,9 @@ fun SwipeCard(
             lineBreak = LineBreak.Paragraph,
         )
     }
-    val header = remember(post.subreddit, post.isNsfw, colors) {
+    val header = remember(post.sourceLabel, post.isNsfw, colors) {
         buildAnnotatedString {
-            withStyle(SpanStyle(color = colors.primary)) { append("r/${post.subreddit}") }
+            withStyle(SpanStyle(color = colors.primary)) { append(post.sourceLabel) }
             if (post.isNsfw) {
                 append("   ")
                 withStyle(SpanStyle(color = colors.error, fontWeight = FontWeight.Bold)) { append("NSFW") }
@@ -276,15 +281,41 @@ fun SwipeCard(
                     )
                 }
             }
-            Text(
-                (if (isShort) "Quick read" else "${post.readMinutes} min read") +
-                    "  ·  ▲ ${post.score}  ·  ${post.numComments} comments",
-                style = typography.labelMedium,
-                color = colors.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    footerText(post, isShort),
+                    style = typography.labelMedium,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (onOpen != null) {
+                    Text(
+                        "Full article ↗",
+                        style = typography.labelLarge,
+                        color = colors.primary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .clickable(onClick = onOpen)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    )
+                }
+            }
         }
         if (decision != null) DecisionStamps(decision)
     }
+}
+
+private fun footerText(post: RedditPost, isShort: Boolean): String {
+    val length = if (isShort) (if (post.isNews) "Headline" else "Quick read") else "${post.readMinutes} min read"
+    if (!post.isNews) return "$length  ·  ▲ ${post.score}  ·  ${post.numComments} comments"
+    if (post.publishedAt <= 0L) return length
+    val age = DateUtils.getRelativeTimeSpanString(
+        post.publishedAt,
+        System.currentTimeMillis(),
+        DateUtils.MINUTE_IN_MILLIS,
+        DateUtils.FORMAT_ABBREV_RELATIVE,
+    )
+    return "$length  ·  $age"
 }
 
 /**

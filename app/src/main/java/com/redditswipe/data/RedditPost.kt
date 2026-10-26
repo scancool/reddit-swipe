@@ -2,6 +2,10 @@ package com.redditswipe.data
 
 import org.json.JSONObject
 
+/**
+ * One card: a Reddit text post, or a news article when [isNews] is set. For news, [subreddit] holds the
+ * feed's name (see [NEWS_FEEDS]) and [permalink] the article's full URL.
+ */
 data class RedditPost(
     val id: String,
     val subreddit: String,
@@ -12,11 +16,17 @@ data class RedditPost(
     val numComments: Int,
     val permalink: String,
     val isNsfw: Boolean,
+    val isNews: Boolean = false,
+    /** When the article was published, in epoch milliseconds; 0 for Reddit posts and unknown dates. */
+    val publishedAt: Long = 0L,
 ) {
-    val url: String get() = "https://www.reddit.com$permalink"
+    val url: String get() = if (isNews) permalink else "https://www.reddit.com$permalink"
+
+    /** Where the card came from, as shown above it: "r/tifu" or "BBC News". */
+    val sourceLabel: String get() = if (isNews) subreddit else "r/$subreddit"
 
     /** From a subreddit of short posts (see [QUICK_READ_SUBREDDITS]) rather than a story subreddit. */
-    val isQuickRead: Boolean by lazy { isQuickReadSubreddit(subreddit) }
+    val isQuickRead: Boolean by lazy { !isNews && isQuickReadSubreddit(subreddit) }
 
     /** Estimated reading time at about 230 words per minute; computed once, since cards redraw often. */
     val readMinutes: Int by lazy {
@@ -34,6 +44,8 @@ data class RedditPost(
         .put("numComments", numComments)
         .put("permalink", permalink)
         .put("isNsfw", isNsfw)
+        .put("isNews", isNews)
+        .put("publishedAt", publishedAt)
 
     companion object {
         private val WHITESPACE = Regex("\\s+")
@@ -48,6 +60,8 @@ data class RedditPost(
             numComments = json.optInt("numComments"),
             permalink = json.getString("permalink"),
             isNsfw = json.optBoolean("isNsfw"),
+            isNews = json.optBoolean("isNews"),
+            publishedAt = json.optLong("publishedAt"),
         )
     }
 }

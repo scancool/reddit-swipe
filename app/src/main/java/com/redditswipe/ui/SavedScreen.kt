@@ -36,7 +36,7 @@ fun SavedScreen(
         items(saved.asReversed(), key = { it.id }) { post ->
             ListItem(
                 modifier = Modifier.clickable { uriHandler.openUri(post.url) },
-                overlineContent = { Text("r/${post.subreddit}  ·  ${post.readMinutes} min read") },
+                overlineContent = { Text("${post.sourceLabel}  ·  ${post.readMinutes} min read") },
                 headlineContent = { Text(post.title, maxLines = 3, overflow = TextOverflow.Ellipsis) },
                 supportingContent = if (post.body.isNotBlank()) {
                     { Text(post.body, maxLines = 2, overflow = TextOverflow.Ellipsis) }
